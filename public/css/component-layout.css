@@ -1,0 +1,52 @@
+.ui-a36b1709{margin-right: 6px;}
+.ui-8247523b{background:#f4f6f3;color:#6d7b6f;}
+.ui-989fc886{background:#f4f6f3;color:#6d7b6f;text-transform:capitalize;}
+.ui-afe7421b{text-align:center;padding:24px;color:#64748b;}
+.ui-13daa001{color:#0f172a;}
+.ui-93e6231c{color:#64748b;}
+.ui-7afa0e1f{max-width: 950px; width: 100%;}
+.ui-fd95725c{display:grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 20px;}
+.ui-468f9ee5{background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px;}
+.ui-229b4642{color:#64748b; display:block; font-size:11px; text-transform:uppercase; font-weight:600;}
+.ui-a3a55686{margin-top:4px;}
+.ui-235184ae{font-size:20px; color:#0f172a;}
+.ui-47da5e81{font-size:20px; color:#16a34a;}
+.ui-c9bb80de{font-size:20px; color:#2563eb;}
+.ui-9d41c503{background:#f1f5f9; padding:10px 14px; border-radius:6px; margin-bottom:16px; font-size:13px; color:#334155; display:flex; flex-wrap:wrap; justify-content:space-between; gap:10px;}
+.ui-2a236c5d{background:#fef2f2; border:1px solid #fecaca; border-radius:6px; padding:12px; margin-bottom:16px; color:#991b1b; font-size:13px;}
+.ui-58e280fd{display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;}
+.ui-2e683146{display:flex; gap:10px; align-items:center; flex:1; min-width:240px;}
+.ui-b76633f1{margin:0; flex:1;}
+.ui-7875a2b7{padding:6px 10px 6px 30px; font-size:13px;}
+.ui-a48cc473{padding:6px 10px; border-radius:6px; border:1px solid #cbd5e1; font-size:13px;}
+.ui-8149d75f{max-height: 400px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px;}
+.ui-979f14d2{width: 100%; border-collapse: collapse; font-size: 13px;}
+.ui-95efa713{position: sticky; top: 0; background: #f8fafc; border-bottom: 2px solid #e2e8f0; z-index: 1;}
+.ui-d0097a5b{padding: 8px 10px; text-align: left;}
+.ui-5fa693f3{margin-top: 20px;}
+.ui-ff122a58{max-width: 900px; width: 100%;}
+.ui-c749d4fb{max-height: 450px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px; margin-top: 14px;}
+.ui-308ceadf{position: sticky; top: 0; background: #f8fafc; border-bottom: 2px solid #e2e8f0;}
+.ui-fb3bd801{margin-top: 18px;}
+.ui-d5b43342{grid-column: 1 / -1;}
+.ui-7e1343d0{display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;}
+.ui-ff227d06{margin: 0;}
+.ui-6c63b477{margin: 4px 0 0;}
+.ui-3e43f6f8{margin-bottom: 28px;}
+.ui-85aafcf8{display: flex; gap: 10px; align-items: center;}
+.ui-6230a1cf{padding: 0 24px 24px;}
+.ui-81b032c2{margin: 20px auto; max-width: 500px; padding: 28px; text-align: center;}
+.ui-f4c14f3c{width: 48px; height: 48px; margin: 0 auto 12px;}
+.ui-7f3cbaf6{margin-bottom: 8px;}
+.ui-97c8a088{font-size: 12px; margin-bottom: 16px;}
+.ui-23b34f3d{display: inline-flex; align-items: center; gap: 6px;}
+.ui-ef7a9dfb{margin-top: 24px;}
+.ui-bc6560f4{display: flex; gap: 12px; align-items: center;}
+/* Tracking and protected administration */
+.record-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;padding:24px;align-items:end;border-bottom:1px solid var(--border,#e5e7eb)}
+.management-panel{padding:24px;margin:24px 0}.management-panel h2{margin-bottom:12px}.management-panel p{line-height:1.65}.management-panel .form-grid{align-items:end}
+.danger-zone{border:1px solid #e5b8b0;background:#fffafa}.deletion-warning{color:#922d26;background:#fff0ec;border:1px solid #efc6bb;padding:16px;line-height:1.6;border-radius:8px}
+.deletion-counts{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin:20px 0}.deletion-counts>div{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #eee}.deletion-counts dd{font-weight:700}
+.record-id{overflow-wrap:anywhere;max-width:240px;font-size:11px}.record-remarks{min-width:180px;max-width:320px;white-space:normal;overflow-wrap:anywhere}.form-error{color:#a12e24;min-height:1em}
+.sidebar nav{overflow-y:auto;min-height:0}.sidebar{max-height:100dvh}.panel+.panel{margin-top:24px}
+@media(max-width:600px){.record-filters{grid-template-columns:1fr;padding:16px}.deletion-counts{grid-template-columns:1fr}.management-panel{padding:16px}.management-panel .form-grid{grid-template-columns:1fr}.record-filters .button-group{flex-wrap:wrap}}

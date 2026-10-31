@@ -25,7 +25,15 @@ async function getApp() {
 export default async function handler(req, res) {
   try {
     const app = await getApp();
-    return app(req, res);
+    return new Promise((resolve, reject) => {
+      res.on('finish', resolve);
+      res.on('close', resolve);
+      res.on('error', reject);
+      app(req, res, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
   } catch (error) {
     console.error('[Vercel Serverless Invocation Error]:', error);
     if (!res.headersSent) {
