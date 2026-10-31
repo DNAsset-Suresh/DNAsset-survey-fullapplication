@@ -48,8 +48,21 @@ export function createFirebaseStorage(customStorage = firebaseStorage) {
             await uploadBytes(fileRef, buffer, metadata);
             return { error: null };
           } catch (err) {
-            console.error('[Firebase Storage] Upload error:', err.message);
-            return { error: err };
+            console.warn('[Firebase Storage] Primary upload failed, saving to Firestore fallback:', err.message);
+            try {
+              const safeDocId = storagePath.replace(/\//g, '__');
+              await setDoc(doc(firestoreDb, 'storage_objects', safeDocId), {
+                path: storagePath,
+                data: Buffer.from(buffer).toString('base64'),
+                contentType: options.contentType || 'application/octet-stream',
+                size: buffer.length,
+                updatedAt: new Date().toISOString()
+              });
+              return { error: null };
+            } catch (fallbackErr) {
+              console.error('[Firebase Storage] Fallback upload error:', fallbackErr.message);
+              return { error: fallbackErr };
+            }
           }
         },
         async download(storagePath) {
@@ -58,23 +71,32 @@ export function createFirebaseStorage(customStorage = firebaseStorage) {
             const bytes = await getBytes(fileRef);
             return { data: new Blob([bytes]), error: null };
           } catch (err) {
-            console.error('[Firebase Storage] Download error:', err.message);
+            try {
+              const safeDocId = storagePath.replace(/\//g, '__');
+              const docSnap = await getDoc(doc(firestoreDb, 'storage_objects', safeDocId));
+              if (docSnap.exists()) {
+                const item = docSnap.data();
+                const buffer = Buffer.from(item.data, 'base64');
+                return { data: new Blob([buffer], { type: item.contentType }), error: null };
+              }
+            } catch (fallbackErr) {
+              console.error('[Firebase Storage] Fallback download error:', fallbackErr.message);
+            }
             return { data: null, error: err };
           }
         },
         async remove(paths) {
-          try {
-            for (const sp of paths) {
+          for (const sp of paths) {
+            try {
               const fileRef = storageRef(customStorage, sp);
-              await deleteObject(fileRef).catch(e => {
-                if (e.code !== 'storage/object-not-found') throw e;
-              });
-            }
-            return { error: null };
-          } catch (err) {
-            console.error('[Firebase Storage] Remove error:', err.message);
-            return { error: err };
+              await deleteObject(fileRef).catch(() => {});
+            } catch {}
+            try {
+              const safeDocId = sp.replace(/\//g, '__');
+              await deleteDoc(doc(firestoreDb, 'storage_objects', safeDocId));
+            } catch {}
           }
+          return { error: null };
         },
         async createSignedUrl(storagePath, expiresIn = 60, options = {}) {
           try {

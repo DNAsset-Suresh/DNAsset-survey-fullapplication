@@ -582,6 +582,71 @@ export async function initFirebaseClients(config) {
         return { data: { success: true }, error: null };
       }
 
+      if (opName === 'commit_file') {
+        const { p_actor, p_document, p_file, p_replace = null } = opArgs;
+        const fileId = randomUUID();
+        const now = new Date().toISOString();
+        const fileRecord = {
+          id: fileId,
+          property_document_id: p_document,
+          original_file_name: p_file.original_file_name,
+          storage_path: p_file.storage_path,
+          mime_type: p_file.mime_type,
+          file_size: Number(p_file.file_size) || 0,
+          uploaded_by: p_actor,
+          uploaded_at: now,
+          created_at: now
+        };
+        await setDoc(doc(firestoreDb, 'uploaded_files', fileId), fileRecord);
+
+        if (p_replace) {
+          await deleteDoc(doc(firestoreDb, 'uploaded_files', p_replace));
+        }
+
+        const docRef = doc(firestoreDb, 'property_documents', p_document);
+        await setDoc(docRef, {
+          is_collected: true,
+          verification_status: 'Uploaded',
+          reviewer_id: null,
+          survey_match_status: 'Not Checked',
+          rejection_reason: '',
+          updated_at: now
+        }, { merge: true });
+
+        // Audit log
+        const auditId = randomUUID();
+        await setDoc(doc(firestoreDb, 'audit_logs', auditId), {
+          id: auditId,
+          actor_id: p_actor,
+          action: p_replace ? 'file.replaced' : 'file.uploaded',
+          property_document_id: p_document,
+          created_at: now
+        });
+
+        return { data: fileId, error: null };
+      }
+
+      if (opName === 'remove_file') {
+        const { p_actor, p_file } = opArgs;
+        const fileRef = doc(firestoreDb, 'uploaded_files', p_file);
+        const fileSnap = await getDoc(fileRef);
+        if (fileSnap.exists()) {
+          const fileData = fileSnap.data();
+          await deleteDoc(fileRef);
+          if (fileData.property_document_id) {
+            const otherFiles = await getDocs(query(collection(firestoreDb, 'uploaded_files'), where('property_document_id', '==', fileData.property_document_id)));
+            if (otherFiles.empty) {
+              await updateDoc(doc(firestoreDb, 'property_documents', fileData.property_document_id), {
+                is_collected: false,
+                verification_status: 'Pending',
+                updated_at: new Date().toISOString()
+              });
+            }
+          }
+        }
+        return { data: null, error: null };
+      }
+
       return { data: null, error: null };
     } catch (err) {
       console.error(`[Firebase RPC] ${name} error:`, err);

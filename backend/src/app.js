@@ -37,13 +37,20 @@ export function createApp(config=configuration(),providedClients) {
   app.get('/api',(_req,res)=>res.json({status:'ok',service:'DNAssets Survey API',configured:config.configured}));
   app.get('/api/config',(_req,res)=>res.json({configured:config.configured,maxFileBytes:config.maxFileBytes,isLocal:Boolean(config.isLocal),emailEnabled:Boolean(config.smtp?.enabled),adminEmail:config.smtp?.user||''}));
   app.get('/api/storage/download/:token',async(req,res,next)=>{
-    const entry=dbs.signedDownloads?.get(req.params.token);
-    if(!entry||entry.expires<Date.now())throw fail(404,'Download link expired or is invalid.');
+    const entry=dbs.signedDownloads?.get(req.params.token) || { storagePath: decodeURIComponent(req.params.token) };
+    if(entry.expires && entry.expires < Date.now()) throw fail(404, 'Download link expired or is invalid.');
     const file=unwrap(await dbs.admin.from('uploaded_files').select('id,mime_type,original_file_name').eq('storage_path',entry.storagePath).maybeSingle());
     if(!file)throw fail(404,'File no longer exists.');
     res.attachment(entry.filename||file.original_file_name).type(file.mime_type);
     if(!entry.filename && ['application/pdf','image/png','image/jpeg'].includes(file.mime_type))res.set('Content-Disposition',res.get('Content-Disposition').replace(/^attachment/,'inline'));
-    res.sendFile(entry.path,(error)=>{if(error&&!res.headersSent)next(fail(404,'Stored file is missing.'));});
+    if (entry.path) {
+      res.sendFile(entry.path,(error)=>{if(error&&!res.headersSent)next(fail(404,'Stored file is missing.'));});
+    } else {
+      const downloaded = await dbs.admin.storage.from(config.bucket).download(entry.storagePath);
+      if (downloaded.error || !downloaded.data) throw fail(404, 'Stored file is missing.');
+      const buffer = Buffer.from(await downloaded.data.arrayBuffer());
+      res.send(buffer);
+    }
   });
   const loginLimiter=rateLimit({windowMs:15*60000,limit:20,standardHeaders:'draft-8',legacyHeaders:false});
   const requireConfigured=(_req,_res,next)=>next(config.configured?undefined:fail(503,'Supabase is not configured. Follow the setup instructions in README.md.'));
