@@ -25,18 +25,71 @@ export function containedPath(root,...parts) {
   return target;
 }
 export function sessionStore() {
-  const access=new Map(), refresh=new Map();
-  const revoke = token => { const s=access.get(token)||refresh.get(token); if(s) {access.delete(s.access_token);refresh.delete(s.refresh_token);} };
+  const secret = process.env.SESSION_SECRET || process.env.SUPABASE_SECRET_KEY || 'dnassets-survey-session-secret-2026';
+  const access = new Map(), refreshMap = new Map();
+  const revoked = new Set();
+
+  function signToken(payload) {
+    const data = Buffer.from(JSON.stringify(payload)).toString('base64url');
+    const sig = crypto.createHmac('sha256', secret).update(data).digest('base64url');
+    return `${data}.${sig}`;
+  }
+
+  function verifyToken(token, expectedType) {
+    if (!token || typeof token !== 'string' || revoked.has(token)) return null;
+    const parts = token.split('.');
+    if (parts.length === 2) {
+      const [data, sig] = parts;
+      const expectedSig = crypto.createHmac('sha256', secret).update(data).digest('base64url');
+      if (sig.length === expectedSig.length && crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig))) {
+        try {
+          const payload = JSON.parse(Buffer.from(data, 'base64url').toString('utf8'));
+          if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
+          if (expectedType && payload.type !== expectedType) return null;
+          return payload;
+        } catch {
+          return null;
+        }
+      }
+    }
+    // Backward compatibility with local in-memory Map
+    const s = access.get(token) || refreshMap.get(token);
+    if (s && s.expires_at > Math.floor(Date.now() / 1000)) {
+      if (!expectedType || s.type === expectedType) return s;
+    }
+    return null;
+  }
+
+  const revoke = token => {
+    if (token) revoked.add(token);
+    const s = access.get(token) || refreshMap.get(token);
+    if (s) { access.delete(s.access_token); refreshMap.delete(s.refresh_token); }
+  };
+
   return {
     issue(user) {
-      for(const [token,s] of refresh) if(s.refreshExpires<Date.now()) revoke(token);
-      const s={sub:user.id,email:user.email,access_token:crypto.randomBytes(32).toString('base64url'),refresh_token:crypto.randomBytes(32).toString('base64url'),expires_at:Math.floor(Date.now()/1000)+3600,refreshExpires:Date.now()+86400000};
-      access.set(s.access_token,s);refresh.set(s.refresh_token,s);
-      return {access_token:s.access_token,refresh_token:s.refresh_token,expires_at:s.expires_at};
+      const now = Math.floor(Date.now() / 1000);
+      const expires_at = now + 86400; // 24 hours
+      const refreshExpires = now + (7 * 86400); // 7 days
+      const access_token = signToken({ sub: user.id, email: user.email, exp: expires_at, type: 'access' });
+      const refresh_token = signToken({ sub: user.id, email: user.email, exp: refreshExpires, type: 'refresh' });
+      const s = { sub: user.id, email: user.email, access_token, refresh_token, expires_at, refreshExpires: refreshExpires * 1000 };
+      access.set(access_token, s);
+      refreshMap.set(refresh_token, s);
+      return { access_token, refresh_token, expires_at };
     },
-    verify(token) {const s=access.get(token);return s&&s.expires_at> Date.now()/1000?s:null;},
-    refresh(token) {const s=refresh.get(token);if(!s||s.refreshExpires<Date.now())return null;revoke(token);return this.issue({id:s.sub,email:s.email});},
+    verify(token) {
+      return verifyToken(token, 'access');
+    },
+    refresh(token) {
+      const s = verifyToken(token, 'refresh');
+      if (!s) return null;
+      revoke(token);
+      return this.issue({ id: s.sub, email: s.email });
+    },
     revoke,
-    revokeUser(id) {for(const [token,s] of access) if(s.sub===id)revoke(token);}
+    revokeUser(id) {
+      for (const [token, s] of access) if (s.sub === id) revoke(token);
+    }
   };
 }
