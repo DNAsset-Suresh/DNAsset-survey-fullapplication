@@ -30,7 +30,7 @@ export function createApp(config=configuration(),providedClients) {
     imgSrc:["'self'",'data:',"https://*.google-analytics.com","https://*.googletagmanager.com"],
     objectSrc:["'none'"],frameAncestors:["'none'"],
     upgradeInsecureRequests:config.production?[]:null}},strictTransportSecurity:config.production?undefined:false}));
-  app.use(cors({origin(origin,callback){callback(null,!origin || config.origins.includes(origin));},methods:['GET','POST','PUT','DELETE'],allowedHeaders:['Authorization','Content-Type','X-Project-Password','X-Project-Unlock-Token']}));
+  app.use(cors({origin(origin,callback){callback(null,!origin || config.origins.includes(origin) || (typeof origin === 'string' && origin.endsWith('.vercel.app')));},methods:['GET','POST','PUT','DELETE'],allowedHeaders:['Authorization','Content-Type','X-Project-Password','X-Project-Unlock-Token']}));
   app.use('/api',rateLimit({windowMs:60000,limit:180,standardHeaders:'draft-8',legacyHeaders:false}));
   app.use(express.json({limit:'64kb'}));
   app.use('/api',(_req,res,next)=>{res.set('Cache-Control','no-store');next();});
