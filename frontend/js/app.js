@@ -7,7 +7,7 @@ import { previewProperty, previewChecklist } from './preview.js';
 import { renderDashboard, surveyTable, locationText } from './dashboard.js';
 import { propertyForm } from './surveys.js';
 import { renderChecklist, reviewDialog } from './checklist.js';
-import { uploadFiles, openFile } from './uploads.js';
+import { uploadFiles, openFile } from './uploads.js?v=1.0.1';
 import { renderReports, exportReport, emailReport } from './reports.js';
 import { projectModal, surveyModal, renderProjectTable, renderProjectDetail, renderStatusMatrix, renderLockedProjectScreen, unlockProjectModal } from './projects.js';
 
