@@ -9,7 +9,8 @@ export function configuration(env = process.env) {
   const origins = (env.FRONTEND_ORIGINS || 'http://localhost:3000').split(',').map(s => s.trim());
   const databaseUrl = env.USE_LOCAL_DB === 'true' ? '' : (env.DATABASE_URL || '');
   const isLocal = env.USE_LOCAL_DB === 'true' || Boolean(databaseUrl);
-  const configured = Boolean((url && publishableKey && secretKey) || isLocal);
+  const useFirebase = env.USE_FIREBASE === 'true';
+  const configured = Boolean((url && publishableKey && secretKey) || isLocal || useFirebase);
   if (production && (!configured || origins.some(o => !o.startsWith('https://')))) {
     throw new Error('Production requires Supabase configuration and explicit HTTPS frontend origins.');
   }
@@ -39,6 +40,7 @@ export function configuration(env = process.env) {
     measurementId: env.FIREBASE_MEASUREMENT_ID || "G-KPL15TZRK4"
   };
   return { url, publishableKey, secretKey, configured, isLocal, production, databaseUrl,
+    useFirebase,
     firebase,
     surveyBackupEnabled:env.SURVEY_BACKUP_ENABLED!=='false',surveyBackupDirectory:env.SURVEY_BACKUP_DIRECTORY||'backups/operations',
     storageCleanupEnabled: env.STORAGE_CLEANUP_ENABLED === 'true',
