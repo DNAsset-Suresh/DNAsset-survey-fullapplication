@@ -158,9 +158,9 @@ function createFirestoreQuery(firestore, table, actorId = null) {
         return { data: null, error: { code: '500', message: err.message } };
       }
     },
-    async delete() {
+    delete() {
       isDelete = true;
-      return builder.execute();
+      return builder;
     },
     async then(resolve) {
       try {

@@ -268,25 +268,18 @@ export function createApp(config=configuration(),providedClients) {
   app.delete('/api/projects/:id', role('admin'), async (req, res) => {
     const id = uuid.parse(req.params.id);
     const project = await projectAccess(dbs.admin, id); // bypass RLS
-    // Delete uploaded files for this project's documents (no cascade from projects→uploaded_files)
-    await dbs.admin.from('uploaded_files').delete().in(
-      'property_document_id',
-      (await allRows(() =>
-        dbs.admin.from('property_documents').select('id,property_id')
-      )).filter(d => {
-        // We need property IDs for this project — do a second pass
-        return false; // placeholder — handled below
-      }).map(d => d.id)
-    );
-    // Simpler: fetch property IDs, then doc IDs, then delete uploaded_files
+    // Delete files, documents, properties, and project members belonging to this project
     const propIds = (await allRows(() => dbs.admin.from('properties').select('id').eq('project_id', id))).map(p => p.id);
     if (propIds.length) {
       const docIds = (await allRows(() => dbs.admin.from('property_documents').select('id').in('property_id', propIds))).map(d => d.id);
       if (docIds.length) {
         await dbs.admin.from('uploaded_files').delete().in('property_document_id', docIds);
+        await dbs.admin.from('property_documents').delete().in('id', docIds);
       }
+      await dbs.admin.from('properties').delete().in('id', propIds);
     }
-    // Delete the project (cascades: project_members, properties→property_documents, property_members)
+    await dbs.admin.from('project_members').delete().eq('project_id', id);
+    // Delete the project record
     await dbs.admin.from('projects').delete().eq('id', id);
     res.status(204).end();
   });
