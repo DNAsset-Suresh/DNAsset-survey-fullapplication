@@ -72,10 +72,26 @@ th{font-size:11px;color:#65745e}td{font-size:12px}.survey-link small,.table-smal
 .analysis-review-count { font-size: 20px; color: #64748b; }
 .analysis-review-count.review-needed { color: #dc2626; }
 @media (max-width: 600px) {
-  .button-group { flex-wrap: wrap; max-width: 100%; }
-  .topbar { gap: 8px; }
+  .button-group { flex-wrap: wrap; max-width: 100%; gap: 8px; }
+  .page-heading .button-group { width: 100%; display: flex; flex-wrap: wrap; }
+  .page-heading .button-group .button { flex: 1 1 auto; min-width: 100px; justify-content: center; text-align: center; font-size: 11px; padding: 8px 12px; }
+  .topbar { gap: 8px; padding-inline: 12px; }
   .topbar .environment-pill { display: none; }
-  .breadcrumb { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .breadcrumb { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
   .topbar-right { flex-shrink: 0; }
+  #topbar-upload-history { font-size: 11px; padding: 6px 10px; }
   .section-top { flex-wrap: wrap; }
+  .checklist-progress { grid-template-columns: 1fr !important; gap: 12px; }
+  .property-info { grid-template-columns: 1fr 1fr; gap: 12px; padding: 14px; }
+  #toast {
+    position: fixed;
+    left: 50% !important;
+    bottom: calc(18px + env(safe-area-inset-bottom, 0px)) !important;
+    transform: translateX(-50%) !important;
+    width: auto !important;
+    max-width: min(440px, 92vw) !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28) !important;
+    border-radius: 8px;
+    z-index: 99999;
+  }
 }
