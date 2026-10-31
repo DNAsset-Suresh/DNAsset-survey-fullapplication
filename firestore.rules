@@ -1,0 +1,117 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserRole() {
+      return request.auth.token.role != null ? request.auth.token.role : 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.role == 'admin' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+      );
+    }
+    
+    function isReviewer() {
+      return isAuthenticated() && (
+        getUserRole() == 'reviewer' || isAdmin()
+      );
+    }
+
+    // User profiles
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || (isAuthenticated() && request.auth.uid == userId && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']));
+    }
+    
+    match /profiles/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || (isAuthenticated() && request.auth.uid == userId && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']));
+    }
+
+    // Document Categories (reference table)
+    match /document_categories/{categoryId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Projects
+    match /projects/{projectId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Project Members
+    match /project_members/{memberId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Properties (Survey Numbers)
+    match /properties/{propertyId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Property Members
+    match /property_members/{memberId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Property Documents (Checklists)
+    match /property_documents/{docId} {
+      allow read: if isAuthenticated();
+      allow update: if isAuthenticated(); // Collectors/Users mark collected, Reviewers/Admin verify
+      allow create, delete: if isAdmin();
+    }
+
+    // Uploaded Files
+    match /uploaded_files/{fileId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.uploaded_by == request.auth.uid);
+    }
+
+    // Upload History
+    match /upload_history/{historyId} {
+      allow read: if isAuthenticated() && (isAdmin() || isReviewer() || resource.data.user_id == request.auth.uid);
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (isAdmin() || isReviewer());
+      allow delete: if isAdmin();
+    }
+
+    // Document Analyses & Extracted Survey Numbers
+    match /document_analyses/{analysisId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+    
+    match /extracted_survey_numbers/{extractedId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Document Reviews
+    match /document_reviews/{reviewId} {
+      allow read: if isAuthenticated() && (isAdmin() || isReviewer());
+      allow create, update: if isReviewer();
+      allow delete: if isAdmin();
+    }
+
+    // Audit Logs
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated();
+      allow update, delete: if false; // Immutable audit log
+    }
+  }
+}
+

@@ -1,0 +1,42 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Check file size (<= 20MB)
+    function isAllowedSize() {
+      return request.resource.size <= 20 * 1024 * 1024;
+    }
+    
+    // Check allowed MIME types (PDF, Images, Excel, CSV)
+    function isAllowedType() {
+      return request.resource.contentType.matches('application/pdf')
+        || request.resource.contentType.matches('image/jpeg')
+        || request.resource.contentType.matches('image/png')
+        || request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        || request.resource.contentType.matches('application/vnd.ms-excel')
+        || request.resource.contentType.matches('text/csv');
+    }
+
+    match /{propertyId}/{documentId}/{fileName} {
+      // Allow read to authenticated users
+      allow read: if isAuthenticated();
+      
+      // Allow write if authenticated, within size limit, and correct type
+      allow create: if isAuthenticated() && isAllowedSize() && isAllowedType();
+      
+      // Delete allowed for authenticated users
+      allow delete: if isAuthenticated();
+    }
+
+    // Default deny for all other paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

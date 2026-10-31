@@ -1,0 +1,12 @@
+node_modules/
+backups/
+artifacts/test-*/
+backend/.env
+.env
+backend/serviceAccountKey.json
+storage/
+database/local_pgdata/
+coverage/
+artifacts/
+*.log
+!backend/.env.example
