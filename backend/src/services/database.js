@@ -3,7 +3,7 @@ import { fail } from '../validators.js';
 
 export const clientOptions = {auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}};
 export function clients(config) {
-  if (!config.configured) return {};
+  if (!config.configured || !config.url) return {};
   return {
     admin:createClient(config.url,config.secretKey,clientOptions),
     anonymous:() => createClient(config.url,config.publishableKey,clientOptions),

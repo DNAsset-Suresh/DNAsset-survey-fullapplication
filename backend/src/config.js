@@ -6,12 +6,13 @@ export function configuration(env = process.env) {
   const publishableKey = env.SUPABASE_PUBLISHABLE_KEY || '';
   const secretKey = env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY || '';
   const production = env.NODE_ENV === 'production';
-  const origins = (env.FRONTEND_ORIGINS || 'http://localhost:3000').split(',').map(s => s.trim());
+  const isVercel = Boolean(env.VERCEL || env.VERCEL_ENV);
+  const origins = (env.FRONTEND_ORIGINS || (isVercel && env.VERCEL_URL ? `https://${env.VERCEL_URL}` : (isVercel ? '' : 'http://localhost:3000'))).split(',').map(s => s.trim()).filter(Boolean);
   const databaseUrl = env.USE_LOCAL_DB === 'true' ? '' : (env.DATABASE_URL || '');
   const isLocal = env.USE_LOCAL_DB === 'true' || Boolean(databaseUrl);
-  const useFirebase = env.USE_FIREBASE === 'true';
+  const useFirebase = env.USE_FIREBASE === 'true' || (isVercel && env.USE_FIREBASE !== 'false');
   const configured = Boolean((url && publishableKey && secretKey) || isLocal || useFirebase);
-  if (production && (!configured || origins.some(o => !o.startsWith('https://')))) {
+  if (production && !isVercel && (!configured || origins.some(o => !o.startsWith('https://')))) {
     throw new Error('Production requires Supabase configuration and explicit HTTPS frontend origins.');
   }
   const smtpUser = env.SMTP_USER || '';
