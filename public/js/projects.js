@@ -254,8 +254,8 @@ export function renderStatusMatrix(surveyChecklists, project) {
     <div class="status-matrix-grid">
       ${surveyChecklists.map(item => {
         const p = item.property;
-        const g = item.progress;
-        const docs = item.documents;
+        const g = item.progress || { collected: 0, pending: 7, verified: 0, rejected: 0, under_review: 0, collection_percentage: 0, verification_percentage: 0 };
+        const docs = item.documents || [];
 
         return `
           <article class="matrix-card">
@@ -312,10 +312,10 @@ export function renderStatusMatrix(surveyChecklists, project) {
                     'GP Legal Opinion',
                     'A-Register'
                   ];
-                  const shortName = shortNames[idx] || d.category.name;
+                  const shortName = shortNames[idx] || d.category?.name || 'Document';
 
                   return `
-                    <div class="doc-chip ${statusClass}" title="${esc(d.category.name)}: ${esc(status)} (${fileCount} file${fileCount === 1 ? '' : 's'}) · ${esc(d.survey_match_status)}">
+                    <div class="doc-chip ${statusClass}" title="${esc(d.category?.name || 'Document')}: ${esc(status)} (${fileCount} file${fileCount === 1 ? '' : 's'}) · ${esc(d.survey_match_status || 'Unchecked')}">
                       <span class="doc-chip-order">${String(idx + 1).padStart(2, '0')}</span>
                       <span class="doc-chip-name">${esc(shortName)}</span>
                       <span class="doc-chip-status">${iconText} ${esc(status)}</span>

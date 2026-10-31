@@ -28,6 +28,58 @@ import { fail } from '../validators.js';
 const sessions = sessionStore();
 const signedDownloads = new Map();
 
+export const DEFAULT_CATEGORIES = [
+  {
+    id: '671c3c57-5f93-401b-aa43-42097ec4f522',
+    name: 'Title Documents',
+    description: 'Registered deeds and the chain of title.',
+    display_order: 1,
+    is_active: true
+  },
+  {
+    id: '6c8f7d26-9931-4d21-8d9c-a9e98c9dbe5a',
+    name: 'Field Measurement Book (FMB)',
+    description: 'Survey sketch and field measurements.',
+    display_order: 2,
+    is_active: true
+  },
+  {
+    id: '57da0f1b-1649-4840-b3f0-9fdf4388f586',
+    name: 'Patta',
+    description: 'Revenue record for the property.',
+    display_order: 3,
+    is_active: true
+  },
+  {
+    id: '144eede7-795f-4a6c-80b3-9a1ff423493f',
+    name: 'Encumbrance Certificate (EC)',
+    description: 'Recorded transactions and encumbrances.',
+    display_order: 4,
+    is_active: true
+  },
+  {
+    id: 'e3e5f0d1-e221-4a72-8b35-71ee51171865',
+    name: 'Adangal',
+    description: 'Land use and cultivation record.',
+    display_order: 5,
+    is_active: true
+  },
+  {
+    id: '9424b345-39c0-48b9-aa4c-42322f0a2dfe',
+    name: 'Government Pleader Legal Opinion',
+    description: 'Legal review by the appropriate qualified professional.',
+    display_order: 6,
+    is_active: true
+  },
+  {
+    id: '0c3e9297-bcb8-4ccb-90c6-ec0af9e3e8d5',
+    name: 'A-Register',
+    description: 'Village land and revenue register.',
+    display_order: 7,
+    is_active: true
+  }
+];
+
 /**
  * Creates a QueryBuilder over Firestore collection mirroring PostgREST / Supabase API:
  *   db.from(table).select(fields).eq(col, val).in(col, vals).order(col, opts).limit(n).range(from, to)
@@ -137,16 +189,21 @@ function createFirestoreQuery(firestore, table, actorId = null) {
       try {
         // Special Virtual View: property_progress
         if (table === 'property_progress') {
-          return await computePropertyProgress(firestore, filters);
+          return await computePropertyProgress(firestore, filters, orders, offsetCount, limitCount);
         }
         // Special Virtual View: project_progress
         if (table === 'project_progress') {
-          return await computeProjectProgress(firestore, filters);
+          return await computeProjectProgress(firestore, filters, orders, offsetCount, limitCount);
         }
 
         const colRef = collection(firestore, table);
         const snap = await getDocs(colRef);
         let docs = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+
+        // Fallback for document_categories if empty
+        if (table === 'document_categories' && docs.length === 0) {
+          docs = DEFAULT_CATEGORIES.map(c => ({ ...c }));
+        }
 
         // Apply filters in memory for full PostgREST compatibility
         for (const f of filters) {
@@ -169,10 +226,10 @@ function createFirestoreQuery(firestore, table, actorId = null) {
         // Handle UPDATE
         if (isUpdate) {
           for (const d of docs) {
-            await updateDoc(doc(firestore, table, d.id), {
+            await setDoc(doc(firestore, table, d.id), {
               ...updateValues,
               updated_at: new Date().toISOString()
-            });
+            }, { merge: true });
           }
           return { data: null, error: null };
         }
@@ -180,17 +237,21 @@ function createFirestoreQuery(firestore, table, actorId = null) {
         // Apply JOINs
         if (table === 'property_documents' && selectFields.includes('category:document_categories')) {
           const catsSnap = await getDocs(collection(firestore, 'document_categories'));
-          const catMap = new Map(catsSnap.docs.map(cd => [cd.id, cd.data()]));
+          const catMap = new Map(DEFAULT_CATEGORIES.map(c => [c.id, c]));
+          catsSnap.docs.forEach(cd => catMap.set(cd.id, { ...cd.data(), id: cd.id }));
           const profSnap = await getDocs(collection(firestore, 'profiles'));
           const profMap = new Map(profSnap.docs.map(pd => [pd.id, pd.data()]));
 
-          docs = docs.map(d => ({
-            ...d,
-            category: catMap.get(d.document_category_id) || null,
-            reviewer: d.reviewer_id && profMap.has(d.reviewer_id)
-              ? { full_name: profMap.get(d.reviewer_id).full_name }
-              : null
-          }));
+          docs = docs.map(d => {
+            const cat = catMap.get(d.document_category_id) || DEFAULT_CATEGORIES.find(c => c.name === d.document_name) || DEFAULT_CATEGORIES[0];
+            return {
+              ...d,
+              category: cat,
+              reviewer: d.reviewer_id && profMap.has(d.reviewer_id)
+                ? { full_name: profMap.get(d.reviewer_id).full_name }
+                : null
+            };
+          });
         }
 
         if (table === 'uploaded_files' && selectFields.includes('uploader:profiles')) {
@@ -258,7 +319,7 @@ function createFirestoreQuery(firestore, table, actorId = null) {
 }
 
 // Compute property_progress view dynamically
-async function computePropertyProgress(firestore, filters) {
+async function computePropertyProgress(firestore, filters, orders = [], offsetCount = null, limitCount = null) {
   try {
     const propsSnap = await getDocs(collection(firestore, 'properties'));
     const docsSnap = await getDocs(collection(firestore, 'property_documents'));
@@ -306,6 +367,25 @@ async function computePropertyProgress(firestore, filters) {
       }
     }
 
+    if (orders && orders.length) {
+      progress.sort((a, b) => {
+        for (const o of orders) {
+          const va = a[o.col] ?? '';
+          const vb = b[o.col] ?? '';
+          if (va < vb) return o.ascending ? -1 : 1;
+          if (va > vb) return o.ascending ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+
+    if (offsetCount !== null && offsetCount !== undefined) {
+      progress = progress.slice(offsetCount);
+    }
+    if (limitCount !== null && limitCount !== undefined) {
+      progress = progress.slice(0, limitCount);
+    }
+
     return { data: progress, error: null };
   } catch (err) {
     return { data: null, error: { code: '500', message: err.message } };
@@ -313,7 +393,7 @@ async function computePropertyProgress(firestore, filters) {
 }
 
 // Compute project_progress view dynamically
-async function computeProjectProgress(firestore, filters) {
+async function computeProjectProgress(firestore, filters, orders = [], offsetCount = null, limitCount = null) {
   try {
     const projectsSnap = await getDocs(collection(firestore, 'projects'));
     const propsSnap = await getDocs(collection(firestore, 'properties'));
@@ -379,6 +459,25 @@ async function computeProjectProgress(firestore, filters) {
       }
     }
 
+    if (orders && orders.length) {
+      progress.sort((a, b) => {
+        for (const o of orders) {
+          const va = a[o.col] ?? '';
+          const vb = b[o.col] ?? '';
+          if (va < vb) return o.ascending ? -1 : 1;
+          if (va > vb) return o.ascending ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+
+    if (offsetCount !== null && offsetCount !== undefined) {
+      progress = progress.slice(offsetCount);
+    }
+    if (limitCount !== null && limitCount !== undefined) {
+      progress = progress.slice(0, limitCount);
+    }
+
     return { data: progress, error: null };
   } catch (err) {
     return { data: null, error: { code: '500', message: err.message } };
@@ -442,8 +541,10 @@ export async function initFirebaseClients(config) {
         // If new property, seed the 7 required checklist categories
         if (!p_id) {
           const catsSnap = await getDocs(collection(firestoreDb, 'document_categories'));
+          let cats = catsSnap.docs.map(cd => ({ id: cd.id, ...cd.data() }));
+          if (!cats.length) cats = DEFAULT_CATEGORIES;
           const batch = writeBatch(firestoreDb);
-          for (const cd of catsSnap.docs) {
+          for (const cd of cats) {
             const docId = randomUUID();
             const docRef = doc(firestoreDb, 'property_documents', docId);
             batch.set(docRef, {
@@ -467,15 +568,17 @@ export async function initFirebaseClients(config) {
       }
 
       if (opName === 'update_document') {
-        const { p_actor, p_document, p_data } = opArgs;
+        const { p_actor, p_document, p_data, p_review = false } = opArgs;
         const docRef = doc(firestoreDb, 'property_documents', p_document);
         const updatePayload = {
           ...p_data,
-          reviewer_id: p_actor,
-          reviewed_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
-        await updateDoc(docRef, updatePayload);
+        if (p_review) {
+          updatePayload.reviewer_id = p_actor;
+          updatePayload.reviewed_at = new Date().toISOString();
+        }
+        await setDoc(docRef, updatePayload, { merge: true });
         return { data: null, error: null };
       }
 

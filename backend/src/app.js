@@ -631,8 +631,11 @@ export function createApp(config=configuration(),providedClients) {
     let status=error.status || 500;let message=error.message;
     if(error instanceof z.ZodError){status=400;message=error.issues.map(i=>i.message).join(' ');}
     if(error instanceof multer.MulterError){status=error.code==='LIMIT_FILE_SIZE'?413:400;message='Upload rejected. Check the file size and send one file per request.';}
-    if(status>=500 && !error.status){console.error('Request failed:',error.name);message='The request could not be completed.';}
-    res.status(status).json({ error: message, message, code: error.code, projectId: error.projectId });
+    if(status>=500 && !error.status){
+      console.error('Request failed:', error.stack || error);
+      message = error.message || 'The request could not be completed.';
+    }
+    res.status(status).json({ error: message, message, details: error.message, code: error.code, projectId: error.projectId });
   });
   app.locals.cleanup=()=>config.configured?cleanupStorage(dbs.admin,config.bucket):Promise.resolve();
   return app;

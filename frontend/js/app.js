@@ -336,7 +336,7 @@ async function route(reuseData = false) {
                 <tbody>
                   ${filtered.map(d => `
                     <tr>
-                      <td><strong>${esc(d.category.name)}</strong></td>
+                      <td><strong>${esc(d.category?.name || 'Document')}</strong></td>
                       <td>
                         ${esc(d.property.survey_number)}
                         <small class="table-small">${esc(locationText(d.property))}</small>

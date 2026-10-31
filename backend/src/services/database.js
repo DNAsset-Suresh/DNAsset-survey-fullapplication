@@ -51,8 +51,19 @@ export async function checklist(db,propertyId) {
   const ids=documents.map(d=>d.id);
   const files=ids.length ? await allRows(()=>db.from('uploaded_files').select('*, uploader:profiles!uploaded_by(full_name)').in('property_document_id',ids).order('uploaded_at').order('id')) : [];
   for(const doc of documents) doc.files=files.filter(f=>f.property_document_id===doc.id);
-  documents.sort((a,b)=>a.category.display_order-b.category.display_order);
-  const progress=unwrap(await db.from('property_progress').select('*').eq('property_id',propertyId).single());
+  documents.sort((a,b)=>(a.category?.display_order ?? 999)-(b.category?.display_order ?? 999));
+  const progressRes = await db.from('property_progress').select('*').eq('property_id',propertyId).maybeSingle();
+  const progress = progressRes?.data || {
+    property_id: propertyId,
+    required: documents.length || 7,
+    collected: documents.filter(d => d.is_collected && d.files?.length).length,
+    pending: Math.max(0, (documents.length || 7) - documents.filter(d => d.is_collected && d.files?.length).length),
+    verified: documents.filter(d => d.verification_status === 'Verified').length,
+    rejected: documents.filter(d => d.verification_status === 'Rejected').length,
+    under_review: documents.filter(d => d.verification_status === 'Under Review').length,
+    collection_percentage: documents.length ? +(documents.filter(d => d.is_collected && d.files?.length).length / documents.length * 100).toFixed(2) : 0,
+    verification_percentage: documents.length ? +(documents.filter(d => d.verification_status === 'Verified').length / documents.length * 100).toFixed(2) : 0
+  };
   return {property,documents,progress};
 }
 export async function checklistsForProperties(db,properties) {
@@ -66,7 +77,21 @@ export async function checklistsForProperties(db,properties) {
   const fileMap=new Map(),documentMap=new Map(),progressMap=new Map(progress.map(p=>[p.property_id,p]));
   for(const f of files){if(!fileMap.has(f.property_document_id))fileMap.set(f.property_document_id,[]);fileMap.get(f.property_document_id).push(f);}
   for(const d of documents){d.files=fileMap.get(d.id)||[];if(!documentMap.has(d.property_id))documentMap.set(d.property_id,[]);documentMap.get(d.property_id).push(d);}
-  return properties.map(property=>({property,documents:(documentMap.get(property.id)||[]).sort((a,b)=>a.category.display_order-b.category.display_order),progress:progressMap.get(property.id)}));
+  return properties.map(property=>{
+    const pDocs = (documentMap.get(property.id)||[]).sort((a,b)=>(a.category?.display_order ?? 999)-(b.category?.display_order ?? 999));
+    const pProg = progressMap.get(property.id) || {
+      property_id: property.id,
+      required: pDocs.length || 7,
+      collected: pDocs.filter(d => d.is_collected && d.files?.length).length,
+      pending: Math.max(0, (pDocs.length || 7) - pDocs.filter(d => d.is_collected && d.files?.length).length),
+      verified: pDocs.filter(d => d.verification_status === 'Verified').length,
+      rejected: pDocs.filter(d => d.verification_status === 'Rejected').length,
+      under_review: pDocs.filter(d => d.verification_status === 'Under Review').length,
+      collection_percentage: pDocs.length ? +(pDocs.filter(d => d.is_collected && d.files?.length).length / pDocs.length * 100).toFixed(2) : 0,
+      verification_percentage: pDocs.length ? +(pDocs.filter(d => d.verification_status === 'Verified').length / pDocs.length * 100).toFixed(2) : 0
+    };
+    return {property,documents:pDocs,progress:pProg};
+  });
 }
 export async function cleanupStorage(admin,bucket) {
   const {data,error}=await admin.from('storage_cleanup').select('storage_path').order('created_at').limit(50);
