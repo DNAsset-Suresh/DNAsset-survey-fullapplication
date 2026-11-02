@@ -618,28 +618,69 @@ export async function initFirebaseClients(config) {
       if (opName === 'survey_delete_preview') {
         const p_scope = opArgs?.p_scope || 'project';
         const p_id = opArgs?.p_id || null;
+
         const projectsSnap = await getDocs(collection(firestoreDb, 'projects'));
         const propsSnap = await getDocs(collection(firestoreDb, 'properties'));
         const docsSnap = await getDocs(collection(firestoreDb, 'property_documents'));
         const filesSnap = await getDocs(collection(firestoreDb, 'uploaded_files'));
+        const reviewsSnap = await getDocs(collection(firestoreDb, 'document_reviews'));
+        const historySnap = await getDocs(collection(firestoreDb, 'upload_history'));
+
+        const projects = projectsSnap.docs.map(d => ({ ...d.data(), id: d.id }));
+        const props = propsSnap.docs.map(d => ({ ...d.data(), id: d.id }));
+        const docs = docsSnap.docs.map(d => ({ ...d.data(), id: d.id }));
+        const files = filesSnap.docs.map(d => ({ ...d.data(), id: d.id }));
+
+        let prids = [];
+        let pids = [];
+
+        if (p_scope === 'all' || p_scope === 'reset') {
+          prids = projects.map(p => p.id);
+          pids = props.map(p => p.id);
+        } else if (p_scope === 'project' && p_id) {
+          prids = [p_id];
+          pids = props.filter(p => p.project_id === p_id).map(p => p.id);
+        } else if (p_scope === 'survey' && p_id) {
+          pids = [p_id];
+        }
+
+        const pidsSet = new Set(pids);
+        const matchingDocs = docs.filter(d => pidsSet.has(d.property_id));
+        const didsSet = new Set(matchingDocs.map(d => d.id));
+        const matchingFiles = files.filter(f => didsSet.has(f.property_document_id));
+
+        const fileRecords = matchingFiles.map(f => ({
+          storage_path: f.storage_path,
+          file_size: Number(f.file_size) || 0
+        }));
+
+        const totalBytes = fileRecords.reduce((sum, f) => sum + f.file_size, 0);
+        const fingerprint = `${prids.length}_${pids.length}_${matchingDocs.length}_${matchingFiles.length}`;
+
         return {
           data: {
             scope: p_scope,
             target_id: p_id,
-            projects: projectsSnap.docs.length,
-            surveys: propsSnap.docs.length,
-            checklists: docsSnap.docs.length,
-            uploads: filesSnap.docs.length,
-            verifications: 0,
-            history: 0,
+            projects: prids.length,
+            surveys: pids.length,
+            checklists: matchingDocs.length,
+            uploads: matchingFiles.length,
+            verifications: p_scope === 'reset' ? reviewsSnap.docs.length : 0,
+            history: p_scope === 'reset' ? historySnap.docs.length : 0,
             analyses: 0,
             extracted: 0,
-            memberships: 0,
-            storageObjects: filesSnap.docs.length,
-            storage_bytes: 0,
-            phrase: 'CONFIRM DELETION',
+            memberships: prids.length,
+            project_ids: prids,
+            property_ids: pids,
+            files: fileRecords,
+            storageObjects: fileRecords.length,
+            storage_bytes: totalBytes,
+            fingerprint,
+            phrase: p_scope === 'reset' ? 'RESET SURVEY DATABASE' : 'DELETE ALL PROJECTS',
             backupEnabled: true,
-            policy: 'Standard deletion policy applies.'
+            policy: p_scope === 'reset'
+              ? 'Upload and review history will be removed. Audit records, users, accounts, settings and document categories remain.'
+              : 'Upload and review history will be retained. Associated files will be removed. Users and audit records remain.'
           },
           error: null
         };
@@ -647,17 +688,65 @@ export async function initFirebaseClients(config) {
 
       if (opName === 'survey_destroy') {
         const { p_scope, p_id } = opArgs;
-        if (p_scope === 'project' && p_id) {
-          await deleteDoc(doc(firestoreDb, 'projects', p_id));
-        } else if (p_scope === 'all' || p_scope === 'reset') {
-          const projectsSnap = await getDocs(collection(firestoreDb, 'projects'));
-          for (const d of projectsSnap.docs) await deleteDoc(doc(firestoreDb, 'projects', d.id));
-          const propsSnap = await getDocs(collection(firestoreDb, 'properties'));
-          for (const d of propsSnap.docs) await deleteDoc(doc(firestoreDb, 'properties', d.id));
-          const docsSnap = await getDocs(collection(firestoreDb, 'property_documents'));
-          for (const d of docsSnap.docs) await deleteDoc(doc(firestoreDb, 'property_documents', d.id));
+        const projectsSnap = await getDocs(collection(firestoreDb, 'projects'));
+        const propsSnap = await getDocs(collection(firestoreDb, 'properties'));
+        const docsSnap = await getDocs(collection(firestoreDb, 'property_documents'));
+        const filesSnap = await getDocs(collection(firestoreDb, 'uploaded_files'));
+
+        const projects = projectsSnap.docs.map(d => ({ ...d.data(), id: d.id }));
+        const props = propsSnap.docs.map(d => ({ ...d.data(), id: d.id }));
+        const docs = docsSnap.docs.map(d => ({ ...d.data(), id: d.id }));
+        const files = filesSnap.docs.map(d => ({ ...d.data(), id: d.id }));
+
+        let prids = [];
+        let pids = [];
+
+        if (p_scope === 'all' || p_scope === 'reset') {
+          prids = projects.map(p => p.id);
+          pids = props.map(p => p.id);
+        } else if (p_scope === 'project' && p_id) {
+          prids = [p_id];
+          pids = props.filter(p => p.project_id === p_id).map(p => p.id);
+        } else if (p_scope === 'survey' && p_id) {
+          pids = [p_id];
         }
+
+        const pidsSet = new Set(pids);
+        const matchingDocs = docs.filter(d => pidsSet.has(d.property_id));
+        const didsSet = new Set(matchingDocs.map(d => d.id));
+        const matchingFiles = files.filter(f => didsSet.has(f.property_document_id));
+
+        for (const f of matchingFiles) {
+          await deleteDoc(doc(firestoreDb, 'uploaded_files', f.id));
+        }
+        for (const d of matchingDocs) {
+          await deleteDoc(doc(firestoreDb, 'property_documents', d.id));
+        }
+        for (const pid of pids) {
+          await deleteDoc(doc(firestoreDb, 'properties', pid));
+        }
+        for (const prid of prids) {
+          await deleteDoc(doc(firestoreDb, 'projects', prid));
+        }
+
+        if (p_scope === 'reset') {
+          const revSnap = await getDocs(collection(firestoreDb, 'document_reviews'));
+          for (const d of revSnap.docs) await deleteDoc(doc(firestoreDb, 'document_reviews', d.id));
+          const histSnap = await getDocs(collection(firestoreDb, 'upload_history'));
+          for (const d of histSnap.docs) await deleteDoc(doc(firestoreDb, 'upload_history', d.id));
+        }
+
         return { data: { success: true }, error: null };
+      }
+
+      if (opName === 'survey_backup') {
+        const collections = ['projects', 'properties', 'property_documents', 'uploaded_files', 'upload_history', 'document_reviews', 'storage_cleanup', 'property_members', 'project_members', 'document_categories'];
+        const backupData = {};
+        for (const col of collections) {
+          const snap = await getDocs(collection(firestoreDb, col));
+          backupData[col] = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+        }
+        return { data: backupData, error: null };
       }
 
       if (opName === 'survey_archive') {

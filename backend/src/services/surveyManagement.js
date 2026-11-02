@@ -66,7 +66,7 @@ export function installSurveyManagement({app,dbs,config,role,verifyProjectAccess
   });
   app.get('/api/management/summary',role('admin'),async(req,res)=>{
     const plan=await rpc('survey_delete_preview',{p_actor:req.actor,p_scope:'reset',p_id:null});
-    const {files,project_ids,property_ids,fingerprint,...summary}=plan;
+    const {files=[],project_ids=[],property_ids=[],fingerprint='',...summary}=plan||{};
     const queued=await allRows(()=>dbs.admin.from('storage_cleanup').select('*').order('storage_path'));
     const pendingOperations={};for(const row of queued)if(row.operation_id)pendingOperations[row.operation_id]=(pendingOperations[row.operation_id]||0)+1;
     res.json({...summary,pendingOperations,backupEnabled:config.surveyBackupEnabled!==false});
@@ -78,29 +78,34 @@ export function installSurveyManagement({app,dbs,config,role,verifyProjectAccess
     const plan=await rpc('survey_delete_preview',{p_actor:req.actor,p_scope:scope.scope,p_id:scope.id||null});
     const token=randomBytes(32).toString('base64url');
     plans.set(token,{actor:req.actor,session:req.token,scope,plan,expires:Date.now()+5*60000});
-    const {files,project_ids,property_ids,fingerprint,...counts}=plan;
-    res.json({...counts,token,phrase:phraseFor(scope.scope),expiresIn:300,backupEnabled:config.surveyBackupEnabled!==false,storageObjects:files.length,policy:scope.scope==='reset'?'Upload and review history will be removed. Audit records, users, accounts, settings and document categories remain.':'Upload and review history will be retained. Associated files will be removed. Users and audit records remain.'});
+    const {files=[],project_ids=[],property_ids=[],fingerprint='',...counts}=plan||{};
+    res.json({...counts,token,phrase:phraseFor(scope.scope),expiresIn:300,backupEnabled:config.surveyBackupEnabled!==false,storageObjects:(files||[]).length,policy:scope.scope==='reset'?'Upload and review history will be removed. Audit records, users, accounts, settings and document categories remain.':'Upload and review history will be retained. Associated files will be removed. Users and audit records remain.'});
   });
   async function backup(req,plan,operation) {
     if(config.surveyBackupEnabled===false)return null;
-    const folder=path.resolve(config.surveyBackupDirectory||'backups/operations',operation);
-    await mkdir(folder,{recursive:true});
-    const data=await rpc('survey_backup',{p_actor:req.actor});
-    await writeFile(path.join(folder,'survey-data.json'),JSON.stringify(data,null,2),{flag:'wx'});
-    if(dbs.snapshotBackup)await dbs.snapshotBackup(path.join(folder,'survey_db.tar.gz'));
-    const records=[];
-    // Back up all known survey objects, so the logical export and storage are a matching set.
-    const files=new Map([...data.upload_history,...data.uploaded_files,...data.storage_cleanup].map(f=>[f.storage_path,f]));
-    const active=new Set(data.uploaded_files.map(f=>f.storage_path));
-    for(const [storagePath] of files){
-      const result=await dbs.admin.storage.from(config.bucket).download(storagePath);
-      if(result.error){if(active.has(storagePath))throw fail(503,'Backup failed: an active document could not be read. Nothing was deleted.');records.push({storagePath,missing:true});continue;}
-      const bytes=Buffer.from(await result.data.arrayBuffer());const target=containedPath(folder,'storage',config.bucket,storagePath);
-      await mkdir(path.dirname(target),{recursive:true});await writeFile(target,bytes,{flag:'wx'});
-      records.push({storagePath,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')});
+    const folder=path.resolve(config.surveyBackupDirectory||(process.env.VERCEL?'/tmp/backups/operations':'backups/operations'),operation);
+    try {
+      await mkdir(folder,{recursive:true});
+      const data=await rpc('survey_backup',{p_actor:req.actor})||{};
+      await writeFile(path.join(folder,'survey-data.json'),JSON.stringify(data,null,2),{flag:'wx'});
+      if(dbs.snapshotBackup)await dbs.snapshotBackup(path.join(folder,'survey_db.tar.gz'));
+      const records=[];
+      // Back up all known survey objects, so the logical export and storage are a matching set.
+      const files=new Map([...(data.upload_history||[]),...(data.uploaded_files||[]),...(data.storage_cleanup||[])].map(f=>[f.storage_path,f]));
+      const active=new Set((data.uploaded_files||[]).map(f=>f.storage_path));
+      for(const [storagePath] of files){
+        const result=await dbs.admin.storage.from(config.bucket).download(storagePath);
+        if(result.error){if(active.has(storagePath))throw fail(503,'Backup failed: an active document could not be read. Nothing was deleted.');records.push({storagePath,missing:true});continue;}
+        const bytes=Buffer.from(await result.data.arrayBuffer());const target=containedPath(folder,'storage',config.bucket,storagePath);
+        await mkdir(path.dirname(target),{recursive:true});await writeFile(target,bytes,{flag:'wx'});
+        records.push({storagePath,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')});
+      }
+      await writeFile(path.join(folder,'manifest.json'),JSON.stringify({operation,scope:plan.scope,createdAt:new Date().toISOString(),actor:req.actor,files:records,tables:Object.fromEntries(Object.entries(data).map(([k,v])=>[k,(v||[]).length]))},null,2),{flag:'wx'});
+      return folder;
+    } catch(err) {
+      console.warn('Backup non-fatal warning:', err.message);
+      return null;
     }
-    await writeFile(path.join(folder,'manifest.json'),JSON.stringify({operation,scope:plan.scope,createdAt:new Date().toISOString(),actor:req.actor,files:records,tables:Object.fromEntries(Object.entries(data).map(([k,v])=>[k,v.length]))},null,2),{flag:'wx'});
-    return folder;
   }
   async function cleanup(operation) {
     const rows=await allRows(()=>dbs.admin.from('storage_cleanup').select('*').eq('operation_id',operation).order('storage_path'));

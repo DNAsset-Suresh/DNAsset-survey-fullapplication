@@ -43,7 +43,7 @@ export function configuration(env = process.env) {
   return { url, publishableKey, secretKey, configured, isLocal, production, databaseUrl,
     useFirebase,
     firebase,
-    surveyBackupEnabled:env.SURVEY_BACKUP_ENABLED!=='false',surveyBackupDirectory:env.SURVEY_BACKUP_DIRECTORY||'backups/operations',
+    surveyBackupEnabled:env.SURVEY_BACKUP_ENABLED!=='false',surveyBackupDirectory:env.SURVEY_BACKUP_DIRECTORY||(isVercel?'/tmp/backups/operations':'backups/operations'),
     storageCleanupEnabled: env.STORAGE_CLEANUP_ENABLED === 'true',
     databaseCaFile: env.PGSSLROOTCERT || '', localDatabaseFile:env.LOCAL_DATABASE_FILE || '',storageDirectory:env.LOCAL_STORAGE_DIRECTORY || '',
     bucket: env.SUPABASE_STORAGE_BUCKET || 'land-documents', port: number('PORT', 3000, 65535),
