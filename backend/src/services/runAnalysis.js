@@ -1,5 +1,5 @@
 import {fork} from 'node:child_process';
-export function runAnalysis(input,{timeoutMs=45000}={}){
+export function runAnalysis(input,{timeoutMs=120000}={}){
  return new Promise(resolve=>{
   // PDF's native canvas dependency can crash when unloaded from a Windows worker
   // thread. A bounded child process keeps native teardown out of the API process.

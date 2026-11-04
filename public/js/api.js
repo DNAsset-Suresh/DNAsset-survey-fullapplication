@@ -37,8 +37,8 @@ async function refresh() {
   return refreshing;
 }
 
-export async function api(path, { method = 'GET', body, headers: customHeaders, blob = false, publicRequest = false } = {}) {
-  if (session && !publicRequest && session.expires_at * 1000 < Date.now() + 60000) await refresh();
+export async function api(path, { method = 'GET', body, headers: customHeaders, blob = false, publicRequest = false, timeoutMs = 120000 } = {}) {
+  if (session && !publicRequest && session.expires_at * 1000 < Date.now() + 300000) await refresh();
   const headers = { ...customHeaders };
   if (session && !publicRequest) headers.Authorization = `Bearer ${session.access_token}`;
   if (body && !(body instanceof FormData)) headers['Content-Type'] = 'application/json';
@@ -57,9 +57,11 @@ export async function api(path, { method = 'GET', body, headers: customHeaders, 
     }
   }
 
+  const signal = typeof AbortSignal?.timeout === 'function' ? AbortSignal.timeout(timeoutMs) : undefined;
   const response = await fetch(base() + '/api' + path, {
     method,
     headers,
+    signal,
     body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined
   });
 

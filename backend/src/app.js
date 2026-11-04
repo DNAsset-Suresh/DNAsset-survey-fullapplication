@@ -31,7 +31,7 @@ export function createApp(config=configuration(),providedClients) {
     objectSrc:["'none'"],frameAncestors:["'none'"],
     upgradeInsecureRequests:config.production?[]:null}},strictTransportSecurity:config.production?undefined:false}));
   app.use(cors({origin(origin,callback){callback(null,!origin || config.origins.includes(origin) || (typeof origin === 'string' && origin.endsWith('.vercel.app')));},methods:['GET','POST','PUT','DELETE'],allowedHeaders:['Authorization','Content-Type','X-Project-Password','X-Project-Unlock-Token']}));
-  app.use('/api',rateLimit({windowMs:60000,limit:180,standardHeaders:'draft-8',legacyHeaders:false}));
+  app.use('/api',rateLimit({windowMs:60000,limit:600,standardHeaders:'draft-8',legacyHeaders:false}));
   app.use(express.json({limit:'64kb'}));
   app.use('/api',(_req,res,next)=>{res.set('Cache-Control','no-store');next();});
   app.get('/api',(_req,res)=>res.json({status:'ok',service:'DNAssets Survey API',configured:config.configured}));
@@ -430,7 +430,7 @@ export function createApp(config=configuration(),providedClients) {
   });
   const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:config.maxFileBytes,files:1,fields:1,fieldSize:100}}).single('file');
   app.post(['/api/documents/:documentId/files', '/api/properties/:propertyId/documents/:documentId/files'],writer,
-    rateLimit({windowMs:60000,limit:30,standardHeaders:'draft-8',legacyHeaders:false}),
+    rateLimit({windowMs:60000,limit:120,standardHeaders:'draft-8',legacyHeaders:false}),
     async(req,_res,next)=>{req.document=await documentAccess(req.db,uuid.parse(req.params.documentId),req.params.propertyId?uuid.parse(req.params.propertyId):undefined);next();},upload,async(req,res)=>{
       const replaceId=req.body.replace_id?uuid.parse(req.body.replace_id):null;
       if(replaceId){
