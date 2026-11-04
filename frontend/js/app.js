@@ -48,6 +48,7 @@ const navIcon = {
 let renderVersion = 0;
 const previewNotice = () => toast('This is a read-only preview. Configure Supabase to save and manage records.');
 const canEdit = () => !state.preview && !state.checklist?.property?.project_archived_at && ['admin', 'collector'].includes(state.profile.role);
+const canAddSurvey = () => !state.preview && !state.checklist?.property?.project_archived_at && ['admin', 'collector', 'reviewer'].includes(state.profile.role);
 
 function shell() {
   document.querySelector('#app').innerHTML = `
@@ -832,7 +833,7 @@ function wire(page, id) {
 
   // Add Survey Number
   document.querySelectorAll('[data-add-survey]').forEach(b => {
-    b.disabled = !canEdit();
+    b.disabled = !canAddSurvey();
     b.onclick = () => {
       if(page==='project')return surveyModal(id,null,route,state.currentProject);
       if(!state.projects.length)return toast('Create a project before adding its survey number.',true);
@@ -844,7 +845,7 @@ function wire(page, id) {
   // Edit Survey Number
   const editSurvey = document.querySelector('[data-edit]');
   if (editSurvey) {
-    editSurvey.disabled = !canEdit();
+    editSurvey.disabled = !canAddSurvey();
     editSurvey.onclick = () => {
       if (state.checklist?.property) {
         surveyModal(state.checklist.property.project_id, state.checklist.property, route, {});

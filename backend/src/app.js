@@ -296,7 +296,7 @@ export function createApp(config=configuration(),providedClients) {
     res.json(surveys.map(s => ({ ...s, progress: progress.find(x => x.property_id === s.id) })));
   });
 
-  app.post('/api/projects/:id/survey-numbers', role('admin', 'collector'), async (req, res) => {
+  app.post('/api/projects/:id/survey-numbers', role('admin', 'collector', 'reviewer'), async (req, res) => {
     const projectId = uuid.parse(req.params.id);
     const project = await projectAccess(req.db, projectId);
     const body = propertySchema.parse(req.body);
@@ -379,11 +379,11 @@ export function createApp(config=configuration(),providedClients) {
     const progressById=new Map(progress.map(p=>[p.property_id,p]));
     res.json(properties.filter(p=>!p.project_id||active.has(p.project_id)).map(p=>({...p,progress:progressById.get(p.id)})));
   });
-  app.post('/api/properties',role('admin','collector'),async(req,res)=>{
+  app.post('/api/properties',role('admin','collector','reviewer'),async(req,res)=>{
     const id=await rpc(req,'save_property',{p_actor:req.actor,p_data:propertySchema.parse(req.body)});res.status(201).json({id});
   });
   app.get('/api/properties/:id',async(req,res)=>res.json(await propertyAccess(req.db,uuid.parse(req.params.id))));
-  app.put('/api/properties/:id',role('admin','collector'),async(req,res)=>{
+  app.put('/api/properties/:id',role('admin','collector','reviewer'),async(req,res)=>{
     const id=uuid.parse(req.params.id);await propertyAccess(req.db,id);
     await rpc(req,'save_property',{p_actor:req.actor,p_id:id,p_data:propertySchema.parse(req.body)});res.json({id});
   });

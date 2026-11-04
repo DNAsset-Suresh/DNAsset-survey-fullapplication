@@ -344,6 +344,7 @@ export function renderProjectDetail(project, matrixData, state) {
   const prog = p.progress || { survey_count: 0, required: 0, collected: 0, pending: 0, verified: 0, rejected: 0, under_review: 0, collection_percentage: 0, verification_percentage: 0 };
   const checklists = matrixData.survey_checklists || [];
   const canEdit = !p.archived_at && !state.preview && ['admin', 'collector'].includes(state.profile.role);
+  const canAddSurvey = !p.archived_at && !state.preview && ['admin', 'collector', 'reviewer'].includes(state.profile.role);
   const canDelete = !state.preview && state.profile.role === 'admin';
   const isProtected = Boolean(p.is_password_protected);
   const isUnlocked = Boolean(p.is_unlocked);
@@ -363,7 +364,7 @@ export function renderProjectDetail(project, matrixData, state) {
         <p>Project Code: <strong>${esc(p.project_code || 'Not entered')}</strong> <span class="dot-divider">·</span> ${esc(locationText(p))} <span class="dot-divider">·</span> ${p.total_land_extent ? `${esc(p.total_land_extent)} ${esc(p.measurement_unit)}` : 'Extent pending'}</p>
       </div>
       <div class="button-group">
-        <button class="button primary" data-add-survey ${canEdit ? '' : 'disabled'}>${icon('plus')} Add Survey Number</button>
+        <button class="button primary" data-add-survey ${canAddSurvey ? '' : 'disabled'}>${icon('plus')} Add Survey Number</button>
         <button class="button" data-edit-project ${canEdit ? '' : 'disabled'}>${icon('edit')} Edit Project</button>
         <button class="button" data-export-project="pdf">${icon('download')} Project Report</button>
         ${canDelete ? `<button class="button danger" data-delete-project="${esc(p.id)}" style="background:#c0392b;color:#fff;border-color:#c0392b;">${icon('close')} Delete Project</button>` : ''}
