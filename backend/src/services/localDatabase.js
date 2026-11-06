@@ -378,7 +378,7 @@ export async function initLocalClients(config) {
       grant select, insert, update, delete on storage.objects to anon, authenticated;
     `);
 
-    for (const name of ['001_initial_schema', '002_seed_document_categories', '003_security_policies', '004_transactional_operations', '005_project_wise_survey_hierarchy', '006_project_access_password', '007_upload_tracking_and_analysis']) {
+    for (const name of ['001_initial_schema', '002_seed_document_categories', '003_security_policies', '004_transactional_operations', '005_project_wise_survey_hierarchy', '006_project_access_password', '007_upload_tracking_and_analysis', '017_survey_schedules_and_pr_chains']) {
       const sql = await readFile(path.resolve(`database/migrations/${name}.sql`), 'utf8');
       await db.exec(sql);
     }
@@ -427,6 +427,11 @@ export async function initLocalClients(config) {
   if (!reviewerAccessApplied.rows[0].definition.includes("'reviewer'")) {
     console.log('[Local PostgreSQL] Applying 014_reviewer_access.sql...');
     await db.exec(await readFile(path.resolve('database/migrations/014_reviewer_access.sql'), 'utf8'));
+  }
+  const schedulesApplied = await db.query("select exists(select 1 from information_schema.tables where table_schema='public' and table_name='project_schedules') as ex");
+  if (!schedulesApplied.rows[0]?.ex) {
+    console.log('[Local PostgreSQL] Applying 017_survey_schedules_and_pr_chains.sql...');
+    await db.exec(await readFile(path.resolve('database/migrations/017_survey_schedules_and_pr_chains.sql'), 'utf8'));
   }
   if (!isRemote) await flushDb();
   const sessions = sessionStore();

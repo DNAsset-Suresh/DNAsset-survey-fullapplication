@@ -67,6 +67,65 @@ export const adminUpdateUserSchema = z.object({
 }).strict().refine(data => data.full_name !== undefined || data.password !== undefined || data.role !== undefined, {
   message: 'Either name, password, or role must be provided.'
 });
+
+export const scheduleSchema = z.object({
+  property_id: uuid.nullable().optional(),
+  village: short,
+  survey_number: z.string().trim().min(1, 'Survey number is required').max(80),
+  subdivision_number: z.string().trim().max(80).default(''),
+  total_extent: z.string().trim().max(160).default(''),
+  total_extent_sqft: z.number().finite().min(0).nullable().optional(),
+  extent_conveyed: z.string().trim().max(160).default(''),
+  extent_conveyed_sqft: z.number().finite().min(0).nullable().optional(),
+  patta_number: z.string().trim().max(100).default(''),
+  root_parent_deed: z.string().trim().max(255).default(''),
+  previous_doc_pr: z.string().trim().max(500).default(''),
+  schedule_value: z.number().finite().min(0).nullable().optional(),
+  verification_status: z.enum(['Verified', 'Mentioned in EC only', 'Not independently examined', 'Missing / To Confirm', 'Under Review']).default('Verified'),
+  source_page: z.string().trim().max(160).default(''),
+  remarks: z.string().trim().max(4000).default('')
+}).strict();
+
+export const prChainSchema = z.object({
+  schedule_id: uuid.nullable().optional(),
+  property_id: uuid.nullable().optional(),
+  survey_number: z.string().trim().max(80).default(''),
+  village: short,
+  parent_root_doc: z.string().trim().max(255).default(''),
+  previous_doc_number: z.string().trim().min(1, 'Previous document number is required').max(255),
+  registration_year: z.string().trim().max(20).default(''),
+  registration_date: z.string().trim().max(50).nullable().optional(),
+  document_type: z.string().trim().max(120).default('Sale Deed'),
+  ec_reference: z.string().trim().max(255).default(''),
+  subdivisions: z.string().trim().max(255).default(''),
+  acquisition_deed: z.string().trim().max(255).default(''),
+  from_party: z.string().trim().max(255).default(''),
+  to_party: z.string().trim().max(255).default(''),
+  extent: z.string().trim().max(160).default(''),
+  value: z.number().finite().min(0).nullable().optional(),
+  verification_status: z.enum(['Verified', 'Unverified', 'Mentioned in EC only', 'Pending']).default('Verified'),
+  notes: z.string().trim().max(4000).default(''),
+  attachment_url: z.string().trim().max(1000).default(''),
+  attachment_name: z.string().trim().max(255).default('')
+}).strict();
+
+export const acquisitionDeedSchema = z.object({
+  document_number: z.string().trim().min(1, 'Document number is required').max(255),
+  document_type: z.string().trim().max(120).default('Sale Deed'),
+  registration_year: z.string().trim().max(20).default(''),
+  registration_date: z.string().trim().max(50).nullable().optional(),
+  sro: z.string().trim().max(160).default(''),
+  seller: z.string().trim().max(255).default(''),
+  purchaser: z.string().trim().max(255).default(''),
+  previous_document: z.string().trim().max(255).default(''),
+  survey_numbers: z.string().trim().max(500).default(''),
+  extent: z.string().trim().max(160).default(''),
+  extent_sqft: z.number().finite().min(0).nullable().optional(),
+  value: z.number().finite().min(0).nullable().optional(),
+  source: z.string().trim().max(255).default(''),
+  status: z.string().trim().max(80).default('Verified'),
+  remarks: z.string().trim().max(4000).default('')
+}).strict();
 export function fail(status, message) { return Object.assign(new Error(message), {status}); }
 export async function validateFile(file, maxBytes) {
   if (!file) throw fail(400,'Choose a PDF, Excel, CSV, JPG, or PNG file.');

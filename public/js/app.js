@@ -10,7 +10,7 @@ import { propertyForm } from './surveys.js?v=1.1.1';
 import { renderChecklist, reviewDialog } from './checklist.js?v=1.1.1';
 import { uploadFiles, openFile } from './uploads.js?v=1.1.1';
 import { renderReports, exportReport, emailReport } from './reports.js?v=1.1.1';
-import { projectModal, surveyModal, renderProjectTable, renderProjectDetail, renderStatusMatrix, renderLockedProjectScreen, unlockProjectModal } from './projects.js?v=1.1.1';
+import { projectModal, surveyModal, renderProjectTable, renderProjectDetail, wireProjectDetail, renderStatusMatrix, renderLockedProjectScreen, unlockProjectModal } from './projects.js?v=1.1.1';
 
 const state = {
   preview: false,
@@ -165,7 +165,7 @@ async function boot() {
 async function route(reuseData = false) {
   if (!document.querySelector('#main')) return;
   const version = ++renderVersion;
-  const [page = 'dashboard', id] = (location.hash.slice(1) || 'dashboard').split('/');
+  const [page = 'dashboard', id, subtab] = (location.hash.slice(1) || 'dashboard').split('/');
   if (page === 'verification') {
     location.hash = '#documents';
     return;
@@ -254,13 +254,46 @@ async function route(reuseData = false) {
     } else if (page === 'project') {
       if (state.preview) throw new Error('Preview mode supports dashboard view.');
       try {
-        const matrix=await api(`/projects/${encodeURIComponent(id)}/matrix`);
-        const project={...matrix.project,progress:matrix.progress};
+        const [matrix, scheduleData, prChains, deeds] = await Promise.all([
+          api(`/projects/${encodeURIComponent(id)}/matrix`),
+          api(`/projects/${encodeURIComponent(id)}/schedules`).catch(err => {
+            console.warn('Could not load schedules:', err);
+            return { schedules: [], villages: [], metrics: {} };
+          }),
+          api(`/projects/${encodeURIComponent(id)}/pr-chains`).catch(err => {
+            console.warn('Could not load pr-chains:', err);
+            return [];
+          }),
+          api(`/projects/${encodeURIComponent(id)}/acquisition-deeds`).catch(err => {
+            console.warn('Could not load acquisition deeds:', err);
+            return [];
+          })
+        ]);
+        const project = { ...matrix.project, progress: matrix.progress };
         state.currentProject = project;
         state.currentMatrix = matrix;
+        state.projectScheduleData = scheduleData;
+        state.projectPRChains = prChains;
+        state.projectDeeds = deeds;
+
+        const activeTab = subtab || state.projectActiveTab || 'schedule';
+        state.projectActiveTab = activeTab;
+
         if (breadcrumbEl) breadcrumbEl.textContent = project.project_name || 'Project Details';
-        html = renderProjectDetail(project, matrix, state);
-        if(state.profile.role==='admin')html+=`<section class="panel management-panel"><h2>Project management</h2><div class="button-group"><button class="button" data-archive-project="${project.id}" data-archived="${Boolean(project.archived_at)}">${project.archived_at?'Restore project':'Archive project'}</button><button class="button danger" data-delete-scope="project" data-target-id="${project.id}">Review project deletion</button></div></section>`;
+        html = renderProjectDetail(project, matrix, state, {
+          activeTab,
+          scheduleData,
+          prChains,
+          deeds,
+          activeVillage: state.projectActiveVillage || 'all',
+          search: state.projectScheduleSearch || '',
+          sortCol: state.projectScheduleSortCol || 'survey_number',
+          sortDir: state.projectScheduleSortDir || 'asc',
+          page: state.projectSchedulePage || 1
+        });
+        if (state.profile.role === 'admin') {
+          html += `<section class="panel management-panel"><h2>Project management</h2><div class="button-group"><button class="button" data-archive-project="${project.id}" data-archived="${Boolean(project.archived_at)}">${project.archived_at ? 'Restore project' : 'Archive project'}</button><button class="button danger" data-delete-scope="project" data-target-id="${project.id}">Review project deletion</button></div></section>`;
+        }
       } catch (err) {
         if (err.code === 'PROJECT_PASSWORD_REQUIRED' || err.status === 403) {
           const targetProj = state.projects.find(p => p.id === id) || { id, project_name: 'Protected Project' };
@@ -1066,6 +1099,10 @@ function wire(page, id) {
   }));
 
   document.querySelector('[data-manage-members]')?.addEventListener('click', protect(manageMembers));
+
+  if (page === 'project' && state.currentProject) {
+    wireProjectDetail(state.currentProject, state, () => route(true));
+  }
 }
 
 async function manageMembers() {

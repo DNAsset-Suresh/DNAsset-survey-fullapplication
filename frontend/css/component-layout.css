@@ -54,3 +54,519 @@
 /* Property overview lives inside the authenticated survey workspace. */
 #main.property-overview-view{padding:0;max-width:none;background:#0a1220}.page-heading .button-group{flex-wrap:wrap}
 @media print{#main.property-overview-view{background:white}}
+
+/* --- Project Overview Sub-navigation Tabs --- */
+.project-subnav {
+  display: flex;
+  gap: 8px;
+  margin: 20px 0 24px;
+  padding: 6px;
+  background: #f4f7f4;
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 8px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.project-subnav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 0;
+  background: transparent;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 550;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.project-subnav-btn .icon {
+  width: 16px;
+  height: 16px;
+}
+.project-subnav-btn:hover {
+  background: #e9f0e8;
+  color: #1e293b;
+}
+.project-subnav-btn.active {
+  background: #ffffff;
+  color: #173f38;
+  font-weight: 650;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+/* --- Schedule KPI Dashboard (Phase 6) --- */
+.schedule-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.schedule-kpi-card {
+  background: #ffffff;
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 8px;
+  padding: 18px 20px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+}
+.schedule-kpi-card .kpi-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+.schedule-kpi-card .kpi-label .icon {
+  width: 16px;
+  height: 16px;
+  color: #173f38;
+}
+.schedule-kpi-card .kpi-val {
+  font-size: 20px;
+  font-weight: 700;
+  color: #173f38;
+  line-height: 1.25;
+  margin-bottom: 4px;
+}
+.schedule-kpi-card .kpi-sub {
+  font-size: 11px;
+  color: #64748b;
+}
+.methodology-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  background: #edf7f4;
+  border: 1px solid #c2e3da;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #173f38;
+  margin-bottom: 20px;
+}
+.methodology-banner .icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+/* --- Survey-wise Schedule Panel & Table (Dark Navy Style - Phase 8) --- */
+.schedule-panel {
+  padding: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid #1e293b;
+}
+.schedule-header-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 28px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #ffffff;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.schedule-filter-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 28px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.village-pill-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.village-pill {
+  padding: 6px 14px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.village-pill:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+.village-pill.active {
+  background: #173f38;
+  color: #ffffff;
+  border-color: #173f38;
+}
+.schedule-search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 4px 12px;
+  min-width: 280px;
+}
+.schedule-search-box .icon {
+  width: 16px;
+  height: 16px;
+  color: #64748b;
+}
+.schedule-search-box input {
+  border: 0;
+  padding: 6px 0;
+  font-size: 12px;
+  width: 100%;
+  outline: none;
+  background: transparent;
+}
+
+/* Dark Navy Data Table (Phase 8 Requirement) */
+.schedule-table-wrap {
+  overflow-x: auto;
+  background: #0d1726;
+  max-width: 100%;
+}
+.schedule-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  color: #f1f5f9;
+  text-align: left;
+}
+.schedule-table th {
+  background: #162438;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #1e3a5f;
+  white-space: nowrap;
+}
+.schedule-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+.schedule-table th.sortable:hover {
+  color: #38bdf8;
+}
+.schedule-table th.sorted-asc::after {
+  content: ' ▲';
+  font-size: 9px;
+  color: #38bdf8;
+}
+.schedule-table th.sorted-desc::after {
+  content: ' ▼';
+  font-size: 9px;
+  color: #38bdf8;
+}
+.schedule-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #162438;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.schedule-table tbody tr:hover {
+  background: #142234;
+}
+.survey-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  background: #1e3a5f;
+  color: #7dd3fc;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.3px;
+}
+.deed-flow {
+  color: #cbd5e1;
+  font-size: 12px;
+}
+.pr-doc-tag {
+  display: inline-block;
+  padding: 3px 8px;
+  background: #24354a;
+  color: #f8fafc;
+  border-radius: 4px;
+  font-size: 11px;
+}
+.schedule-value-cell {
+  font-weight: 600;
+  color: #4ade80;
+}
+.teal-text {
+  color: #2dd4bf;
+}
+.action-btn-group {
+  display: inline-flex;
+  gap: 6px;
+}
+.icon-btn {
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #cbd5e1;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+.icon-btn:hover {
+  background: #334155;
+  color: #ffffff;
+}
+.icon-btn.danger-btn:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+.empty-table-cell {
+  text-align: center;
+  padding: 40px 20px;
+  color: #94a3b8;
+}
+
+.schedule-table-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 28px;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  font-size: 12px;
+  color: #64748b;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* --- Previous Document (PR) Chain Tree & Flow (Phase 5) --- */
+.pr-chain-visual-flow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 20px 30px;
+  margin-bottom: 24px;
+  overflow-x: auto;
+  gap: 12px;
+}
+.flow-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  min-width: 140px;
+}
+.flow-step-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  display: grid;
+  place-items: center;
+  color: #475569;
+  margin-bottom: 8px;
+}
+.flow-step.active-step .flow-step-icon {
+  background: #173f38;
+  color: #ffffff;
+  border-color: #173f38;
+}
+.flow-arrow {
+  font-size: 20px;
+  color: #94a3b8;
+  font-weight: 700;
+}
+.pr-chain-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+}
+.pr-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+}
+.pr-card.verified-card {
+  border-left: 4px solid #16a34a;
+}
+.pr-card.unverified-card {
+  border-left: 4px solid #f59e0b;
+}
+.pr-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+.pr-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 14px;
+  font-size: 12px;
+  margin-bottom: 14px;
+}
+.pr-details-grid dt {
+  color: #64748b;
+  font-size: 11px;
+}
+.pr-details-grid dd {
+  margin: 0;
+  color: #1e293b;
+}
+.pr-notes {
+  background: #f8fafc;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #475569;
+  margin-bottom: 12px;
+}
+.pr-attachment a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #0284c7;
+  font-weight: 600;
+  text-decoration: underline;
+}
+.pr-card-footer {
+  border-top: 1px solid #f1f5f9;
+  padding-top: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.chain-status-note {
+  font-size: 11px;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* --- Acquisition Deeds Register Cards --- */
+.deeds-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 20px;
+}
+.deed-record-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 22px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+}
+.deed-record-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.deed-badge-icon {
+  width: 36px;
+  height: 36px;
+  background: #edf7f4;
+  color: #173f38;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+}
+.deed-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 16px;
+  font-size: 12px;
+  margin-bottom: 16px;
+}
+.deed-grid dt {
+  color: #64748b;
+  font-size: 11px;
+}
+.deed-grid dd {
+  margin: 0;
+  color: #1e293b;
+}
+.deed-card-footer {
+  border-top: 1px solid #f1f5f9;
+  padding-top: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: #64748b;
+}
+
+/* Schedule Detail Modal View */
+.schedule-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 20px;
+  font-size: 12px;
+  margin-bottom: 20px;
+}
+.schedule-detail-grid dt {
+  color: #64748b;
+  font-size: 11px;
+}
+.schedule-detail-grid dd {
+  margin: 0;
+}
+.schedule-pr-section {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 18px;
+}
+.schedule-pr-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+}
+.schedule-pr-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+.schedule-pr-list small {
+  display: block;
+  color: #64748b;
+  margin-top: 3px;
+}

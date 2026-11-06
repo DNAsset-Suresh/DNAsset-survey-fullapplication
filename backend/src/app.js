@@ -15,7 +15,7 @@ import { createMailer } from './services/mailer.js';
 import { uploadProcessor } from './services/uploadProcessing.js';
 import { checkPassword, hashPassword } from './services/localSecurity.js';
 import * as XLSX from 'xlsx';
-import { uuid,projectSchema,unlockProjectSchema,propertySchema,reviewSchema,collectionSchema,loginSchema,updateProfileSchema,adminUpdateUserSchema,fail } from './validators.js';
+import { uuid,projectSchema,unlockProjectSchema,propertySchema,reviewSchema,collectionSchema,loginSchema,updateProfileSchema,adminUpdateUserSchema,scheduleSchema,prChainSchema,acquisitionDeedSchema,fail } from './validators.js';
 
 export function createApp(config=configuration(),providedClients) {
   const app=express();const dbs=providedClients || clients(config);const mailer=providedClients?.mailer || createMailer(config);
@@ -341,6 +341,298 @@ export function createApp(config=configuration(),providedClients) {
       },
       survey_checklists: surveyChecklists
     });
+  });
+
+  // --- Survey-wise Schedule & PR Chain Helpers ---
+  function parseExtentToSqft(str) {
+    if (!str || typeof str !== 'string') return null;
+    const s = str.trim().toLowerCase()
+      .replace(/½/g, '.5')
+      .replace(/¼/g, '.25')
+      .replace(/¾/g, '.75');
+    const match = s.match(/([\d.]+)\s*(cent|acre|acres|cents|sq\.?\s*ft|sqft|hectare|hectares)?/);
+    if (!match) return null;
+    const val = parseFloat(match[1]);
+    if (!Number.isFinite(val) || val < 0) return null;
+    const unit = match[2] || 'cents';
+    if (unit.startsWith('acre')) return val * 43560;
+    if (unit.startsWith('cent')) return val * 435.6;
+    if (unit.startsWith('sq')) return val;
+    if (unit.startsWith('hectare')) return val * 107639.1;
+    return val * 435.6;
+  }
+
+  function formatSqftToDisplay(sqft) {
+    if (sqft == null || !Number.isFinite(sqft) || sqft <= 0) return '0 sq.ft';
+    const acres = sqft / 43560;
+    const cents = sqft / 435.6;
+    if (acres >= 1) {
+      return `${acres.toFixed(2)} acres (${cents.toFixed(1)} cents · ${Math.round(sqft).toLocaleString('en-IN')} sq.ft)`;
+    }
+    return `${cents.toFixed(2)} cents (${Math.round(sqft).toLocaleString('en-IN')} sq.ft)`;
+  }
+
+  // --- Survey-wise Schedules Endpoints ---
+  app.get('/api/projects/:id/schedules', async (req, res) => {
+    const id = uuid.parse(req.params.id);
+    const dbClient = ['admin', 'reviewer'].includes(req.profile?.role) ? dbs.admin : req.db;
+    const project = await projectAccess(dbClient, id);
+    await verifyProjectAccess(req, project);
+
+    const [schedules, deeds, properties] = await Promise.all([
+      allRows(() => dbClient.from('project_schedules').select('*').eq('project_id', id).order('survey_number').order('id')),
+      allRows(() => dbClient.from('project_acquisition_deeds').select('*').eq('project_id', id).order('id')),
+      allRows(() => dbClient.from('properties').select('*').eq('project_id', id).order('survey_number'))
+    ]);
+
+    // Calculate Dynamic KPIs (Phase 6)
+    let totalConveyedSqft = 0;
+    let totalScheduleValue = 0;
+    const villagesSet = new Set();
+    const subdivisionsSet = new Set();
+    const rootDeedsSet = new Set();
+
+    if (project.village) villagesSet.add(project.village.trim());
+    properties.forEach(p => { if (p.village) villagesSet.add(p.village.trim()); });
+
+    for (const row of schedules) {
+      if (row.village) villagesSet.add(row.village.trim());
+      if (row.subdivision_number) subdivisionsSet.add(`${row.survey_number}/${row.subdivision_number}`);
+      if (row.root_parent_deed) rootDeedsSet.add(row.root_parent_deed.trim());
+      if (row.schedule_value && Number.isFinite(Number(row.schedule_value))) {
+        totalScheduleValue += Number(row.schedule_value);
+      }
+      const sqft = row.extent_conveyed_sqft || parseExtentToSqft(row.extent_conveyed);
+      if (sqft && Number.isFinite(sqft)) totalConveyedSqft += sqft;
+    }
+
+    deeds.forEach(d => { if (d.document_number) rootDeedsSet.add(d.document_number.trim()); });
+
+    const villages = Array.from(villagesSet).filter(Boolean).sort();
+
+    const villageSummaries = villages.map(v => {
+      const vRows = schedules.filter(s => (s.village || '').trim().toLowerCase() === v.toLowerCase());
+      const vVal = vRows.reduce((sum, s) => sum + (Number(s.schedule_value) || 0), 0);
+      const vSqft = vRows.reduce((sum, s) => sum + (s.extent_conveyed_sqft || parseExtentToSqft(s.extent_conveyed) || 0), 0);
+      return {
+        village: v,
+        count: vRows.length,
+        total_value: vVal,
+        total_conveyed_sqft: vSqft,
+        extent_display: formatSqftToDisplay(vSqft)
+      };
+    });
+
+    res.json({
+      project: { id: project.id, project_name: project.project_name, project_code: project.project_code, village: project.village },
+      schedules,
+      villages,
+      metrics: {
+        total_extent_conveyed_sqft: totalConveyedSqft,
+        total_extent_conveyed_display: formatSqftToDisplay(totalConveyedSqft),
+        total_schedule_value: totalScheduleValue,
+        total_schedule_value_formatted: new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(totalScheduleValue),
+        total_subdivisions: subdivisionsSet.size,
+        total_entries: schedules.length,
+        total_villages: villages.length,
+        total_acquisition_deeds: deeds.length || rootDeedsSet.size,
+        village_summaries: villageSummaries,
+        methodology: 'Statistics aggregate active project schedule portions and acquisition deeds without cross-project interpolation.'
+      }
+    });
+  });
+
+  app.post('/api/projects/:id/schedules', role('admin', 'reviewer'), async (req, res) => {
+    const id = uuid.parse(req.params.id);
+    const dbClient = ['admin', 'reviewer'].includes(req.profile?.role) ? dbs.admin : req.db;
+    const project = await projectAccess(dbClient, id);
+    await verifyProjectAccess(req, project);
+
+    const body = scheduleSchema.parse(req.body);
+    const conveyedSqft = body.extent_conveyed_sqft || parseExtentToSqft(body.extent_conveyed);
+    const totalSqft = body.total_extent_sqft || parseExtentToSqft(body.total_extent);
+
+    const record = {
+      ...body,
+      project_id: id,
+      extent_conveyed_sqft: conveyedSqft,
+      total_extent_sqft: totalSqft,
+      created_by: req.actor
+    };
+
+    const inserted = unwrap(await dbClient.from('project_schedules').insert(record));
+    res.status(201).json(Array.isArray(inserted) ? inserted[0] : inserted);
+  });
+
+  app.put('/api/projects/:id/schedules/:scheduleId', role('admin', 'reviewer'), async (req, res) => {
+    const id = uuid.parse(req.params.id);
+    const scheduleId = uuid.parse(req.params.scheduleId);
+    const dbClient = ['admin', 'reviewer'].includes(req.profile?.role) ? dbs.admin : req.db;
+    const project = await projectAccess(dbClient, id);
+    await verifyProjectAccess(req, project);
+
+    const body = scheduleSchema.partial().parse(req.body);
+    if (body.extent_conveyed && body.extent_conveyed_sqft === undefined) {
+      body.extent_conveyed_sqft = parseExtentToSqft(body.extent_conveyed);
+    }
+    if (body.total_extent && body.total_extent_sqft === undefined) {
+      body.total_extent_sqft = parseExtentToSqft(body.total_extent);
+    }
+
+    const updated = unwrap(await dbClient.from('project_schedules').update({ ...body, updated_at: new Date().toISOString() }).eq('id', scheduleId).eq('project_id', id));
+    res.json(Array.isArray(updated) ? updated[0] : updated);
+  });
+
+  app.delete('/api/projects/:id/schedules/:scheduleId', role('admin', 'reviewer'), async (req, res) => {
+    const id = uuid.parse(req.params.id);
+    const scheduleId = uuid.parse(req.params.scheduleId);
+    const dbClient = ['admin', 'reviewer'].includes(req.profile?.role) ? dbs.admin : req.db;
+    const project = await projectAccess(dbClient, id);
+    await verifyProjectAccess(req, project);
+
+    await dbClient.from('project_schedules').delete().eq('id', scheduleId).eq('project_id', id);
+    res.status(204).end();
+  });
+
+  // Sync / Import existing survey numbers from project into schedule
+  app.post('/api/projects/:id/schedules/sync-from-surveys', role('admin', 'reviewer'), async (req, res) => {
+    const id = uuid.parse(req.params.id);
+    const dbClient = ['admin', 'reviewer'].includes(req.profile?.role) ? dbs.admin : req.db;
+    const project = await projectAccess(dbClient, id);
+    await verifyProjectAccess(req, project);
+
+    const [existingSchedules, properties] = await Promise.all([
+      allRows(() => dbClient.from('project_schedules').select('survey_number,subdivision_number').eq('project_id', id)),
+      allRows(() => dbClient.from('properties').select('*').eq('project_id', id).order('survey_number'))
+    ]);
+
+    const existingKey = new Set(existingSchedules.map(s => `${(s.survey_number || '').trim().toLowerCase()}|${(s.subdivision_number || '').trim().toLowerCase()}`));
+    const toInsert = [];
+
+    for (const p of properties) {
+      const key = `${(p.survey_number || '').trim().toLowerCase()}|${(p.subdivision_number || '').trim().toLowerCase()}`;
+      if (!existingKey.has(key)) {
+        const extentStr = p.land_extent ? `${p.land_extent} ${p.land_extent_unit || 'cents'}` : '';
+        const sqft = parseExtentToSqft(extentStr);
+        toInsert.push({
+          project_id: id,
+          property_id: p.id,
+          village: p.village || project.village || '',
+          survey_number: p.survey_number,
+          subdivision_number: p.subdivision_number || '',
+          patta_number: p.patta_number || '',
+          total_extent: extentStr,
+          total_extent_sqft: sqft,
+          extent_conveyed: extentStr,
+          extent_conveyed_sqft: sqft,
+          root_parent_deed: '',
+          previous_doc_pr: '',
+          schedule_value: null,
+          verification_status: 'Verified',
+          created_by: req.actor
+        });
+        existingKey.add(key);
+      }
+    }
+
+    if (toInsert.length) {
+      unwrap(await dbClient.from('project_schedules').insert(toInsert));
+    }
+
+    const allSchedules = await allRows(() => dbClient.from('project_schedules').select('*').eq('project_id', id).order('survey_number'));
+    res.json({ synced_count: toInsert.length, total_schedules: allSchedules.length, schedules: allSchedules });
+  });
+
+  // --- Previous Document (PR) Chains Endpoints ---
+  app.get('/api/projects/:id/pr-chains', async (req, res) => {
+    const id = uuid.parse(req.params.id);
+    const dbClient = ['admin', 'reviewer'].includes(req.profile?.role) ? dbs.admin : req.db;
+    const project = await projectAccess(dbClient, id);
+    await verifyProjectAccess(req, project);
+
+    const chains = await allRows(() => dbClient.from('project_pr_chains').select('*').eq('project_id', id).order('registration_year').order('id'));
+    res.json(chains);
+  });
+
+  app.post('/api/projects/:id/pr-chains', role('admin', 'reviewer'), async (req, res) => {
+    const id = uuid.parse(req.params.id);
+    const dbClient = ['admin', 'reviewer'].includes(req.profile?.role) ? dbs.admin : req.db;
+    const project = await projectAccess(dbClient, id);
+    await verifyProjectAccess(req, project);
+
+    const body = prChainSchema.parse(req.body);
+    const record = { ...body, project_id: id, created_by: req.actor };
+    const inserted = unwrap(await dbClient.from('project_pr_chains').insert(record));
+    res.status(201).json(Array.isArray(inserted) ? inserted[0] : inserted);
+  });
+
+  app.put('/api/projects/:id/pr-chains/:chainId', role('admin', 'reviewer'), async (req, res) => {
+    const id = uuid.parse(req.params.id);
+    const chainId = uuid.parse(req.params.chainId);
+    const dbClient = ['admin', 'reviewer'].includes(req.profile?.role) ? dbs.admin : req.db;
+    const project = await projectAccess(dbClient, id);
+    await verifyProjectAccess(req, project);
+
+    const body = prChainSchema.partial().parse(req.body);
+    const updated = unwrap(await dbClient.from('project_pr_chains').update({ ...body, updated_at: new Date().toISOString() }).eq('id', chainId).eq('project_id', id));
+    res.json(Array.isArray(updated) ? updated[0] : updated);
+  });
+
+  app.delete('/api/projects/:id/pr-chains/:chainId', role('admin', 'reviewer'), async (req, res) => {
+    const id = uuid.parse(req.params.id);
+    const chainId = uuid.parse(req.params.chainId);
+    const dbClient = ['admin', 'reviewer'].includes(req.profile?.role) ? dbs.admin : req.db;
+    const project = await projectAccess(dbClient, id);
+    await verifyProjectAccess(req, project);
+
+    await dbClient.from('project_pr_chains').delete().eq('id', chainId).eq('project_id', id);
+    res.status(204).end();
+  });
+
+  // --- Project Acquisition Deeds Endpoints ---
+  app.get('/api/projects/:id/acquisition-deeds', async (req, res) => {
+    const id = uuid.parse(req.params.id);
+    const dbClient = ['admin', 'reviewer'].includes(req.profile?.role) ? dbs.admin : req.db;
+    const project = await projectAccess(dbClient, id);
+    await verifyProjectAccess(req, project);
+
+    const deeds = await allRows(() => dbClient.from('project_acquisition_deeds').select('*').eq('project_id', id).order('registration_year').order('id'));
+    res.json(deeds);
+  });
+
+  app.post('/api/projects/:id/acquisition-deeds', role('admin', 'reviewer'), async (req, res) => {
+    const id = uuid.parse(req.params.id);
+    const dbClient = ['admin', 'reviewer'].includes(req.profile?.role) ? dbs.admin : req.db;
+    const project = await projectAccess(dbClient, id);
+    await verifyProjectAccess(req, project);
+
+    const body = acquisitionDeedSchema.parse(req.body);
+    const record = { ...body, project_id: id, created_by: req.actor };
+    const inserted = unwrap(await dbClient.from('project_acquisition_deeds').insert(record));
+    res.status(201).json(Array.isArray(inserted) ? inserted[0] : inserted);
+  });
+
+  app.put('/api/projects/:id/acquisition-deeds/:deedId', role('admin', 'reviewer'), async (req, res) => {
+    const id = uuid.parse(req.params.id);
+    const deedId = uuid.parse(req.params.deedId);
+    const dbClient = ['admin', 'reviewer'].includes(req.profile?.role) ? dbs.admin : req.db;
+    const project = await projectAccess(dbClient, id);
+    await verifyProjectAccess(req, project);
+
+    const body = acquisitionDeedSchema.partial().parse(req.body);
+    const updated = unwrap(await dbClient.from('project_acquisition_deeds').update({ ...body, updated_at: new Date().toISOString() }).eq('id', deedId).eq('project_id', id));
+    res.json(Array.isArray(updated) ? updated[0] : updated);
+  });
+
+  app.delete('/api/projects/:id/acquisition-deeds/:deedId', role('admin', 'reviewer'), async (req, res) => {
+    const id = uuid.parse(req.params.id);
+    const deedId = uuid.parse(req.params.deedId);
+    const dbClient = ['admin', 'reviewer'].includes(req.profile?.role) ? dbs.admin : req.db;
+    const project = await projectAccess(dbClient, id);
+    await verifyProjectAccess(req, project);
+
+    await dbClient.from('project_acquisition_deeds').delete().eq('id', deedId).eq('project_id', id);
+    res.status(204).end();
   });
 
   // Survey Numbers aliases for direct REST access

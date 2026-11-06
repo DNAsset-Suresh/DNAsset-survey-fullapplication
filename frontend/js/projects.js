@@ -1,5 +1,16 @@
 import { api, setProjectUnlockToken } from './api.js';
 import { esc, icon, meter, badge, modal, wireForm, toast, empty } from './ui.js';
+import {
+  renderProjectSubnav,
+  renderScheduleTableSection,
+  renderPRChainSection,
+  renderAcquisitionDeedsSection,
+  scheduleEntryModal,
+  prChainModal,
+  acquisitionDeedModal,
+  scheduleDetailModal,
+  exportScheduleToExcel
+} from './project-schedule.js?v=1.1.1';
 
 export const locationText = p => [p.village, p.taluk, p.district].filter(Boolean).join(', ') || 'Location pending';
 
@@ -339,13 +350,13 @@ export function renderStatusMatrix(surveyChecklists, project) {
   `;
 }
 
-export function renderProjectDetail(project, matrixData, state) {
+export function renderProjectDetail(project, matrixData, state, options = {}) {
   const p = project;
   const prog = p.progress || { survey_count: 0, required: 0, collected: 0, pending: 0, verified: 0, rejected: 0, under_review: 0, collection_percentage: 0, verification_percentage: 0 };
-  const checklists = matrixData.survey_checklists || [];
-  const canEdit = !p.archived_at && !state.preview && state.profile.role === 'admin';
-  const canAddSurvey = !p.archived_at && !state.preview && ['admin', 'reviewer'].includes(state.profile.role);
-  const canDelete = !state.preview && state.profile.role === 'admin';
+  const checklists = matrixData?.survey_checklists || [];
+  const canEdit = !p.archived_at && !state.preview && state.profile?.role === 'admin';
+  const canAddSurvey = !p.archived_at && !state.preview && ['admin', 'reviewer'].includes(state.profile?.role);
+  const canDelete = !state.preview && state.profile?.role === 'admin';
   const isProtected = Boolean(p.is_password_protected);
   const isUnlocked = Boolean(p.is_unlocked);
   const lockBadge = isProtected
@@ -353,6 +364,142 @@ export function renderProjectDetail(project, matrixData, state) {
         ? `<span class="badge green" title="Project unlocked in this session">${icon('unlock')} Unlocked</span>`
         : `<span class="badge yellow" title="Password protected">${icon('lock')} Protected</span>`)
     : '';
+
+  const activeTab = options.activeTab || 'overview';
+  const scheduleData = options.scheduleData || { schedules: [], villages: [], metrics: {} };
+  const prChains = options.prChains || [];
+  const deeds = options.deeds || [];
+
+  let tabContent = '';
+
+  if (activeTab === 'overview') {
+    tabContent = `
+      <!-- Project Overview Details Panel -->
+      <section class="panel property-info">
+        <div>
+          <span>Owner</span><strong>${esc(p.owner_name || 'Not entered')}</strong>
+        </div>
+        <div>
+          <span>Promoter / Developer</span>
+          <strong>${esc(p.promoter_name || 'Not entered')}</strong>
+        </div>
+        <div>
+          <span>Total Land Extent</span>
+          <strong>${p.total_land_extent ? `${esc(p.total_land_extent)} ${esc(p.measurement_unit)}` : 'To be entered'}</strong>
+        </div>
+        <div>
+          <span>Survey Numbers</span>
+          <strong>${prog.survey_count} Parcels</strong>
+        </div>
+        <div>
+          <span>Project Status</span>
+          <strong class="teal">${badge(p.status || 'Active')}</strong>
+        </div>
+      </section>
+      ${p.project_address ? `<p class="property-remarks"><strong>Address:</strong> ${esc(p.project_address)}</p>` : ''}
+      ${p.description ? `<p class="property-remarks"><strong>Description:</strong> ${esc(p.description)}</p>` : ''}
+
+      <!-- Authoritative Project Completion Progress -->
+      <div class="checklist-progress">
+        <section class="panel">
+          <div class="progress-label">
+            <h3>Overall Project Collection Progress</h3>
+            <strong>${prog.collection_percentage}%</strong>
+          </div>
+          ${meter(prog.collection_percentage, 'Overall Project Collection')}
+          <p>${prog.collected} of ${prog.required} categories collected <span>·</span> ${prog.pending} pending</p>
+        </section>
+        
+        <section class="panel">
+          <div class="progress-label">
+            <h3>Overall Project Verification Progress</h3>
+            <strong>${prog.verification_percentage}%</strong>
+          </div>
+          ${meter(prog.verification_percentage, 'Overall Project Verification')}
+          <p>${prog.verified} of ${prog.required} categories verified <span>·</span> ${prog.under_review} in review <span>·</span> ${prog.rejected} rejected</p>
+        </section>
+      </div>
+
+      <!-- Quick Section Jump Cards -->
+      <div class="overview-grid" style="margin-top: 24px;">
+        <section class="panel" style="padding: 24px; cursor: pointer;" data-jump-tab="schedule">
+          <div class="section-top" style="margin-bottom: 12px;">
+            <div>
+              <span class="eyebrow">LAND SCHEDULES</span>
+              <h2>Survey-wise Schedule</h2>
+            </div>
+            ${icon('documents')}
+          </div>
+          <p>Inspect exact parcel extents, patta numbers, root deeds, and PR references with dynamic village filtering.</p>
+          <div style="margin-top: 16px;"><span class="text-link">Open Schedule Table →</span></div>
+        </section>
+
+        <section class="panel" style="padding: 24px; cursor: pointer;" data-jump-tab="pr-chain">
+          <div class="section-top" style="margin-bottom: 12px;">
+            <div>
+              <span class="eyebrow">TITLE TRACEABILITY</span>
+              <h2>Previous Document (PR) Chain</h2>
+            </div>
+            ${icon('arrow')}
+          </div>
+          <p>Trace registered document connections per Encumbrance Certificate (EC) from root parent deeds to current acquisition.</p>
+          <div style="margin-top: 16px;"><span class="text-link">View PR Relationship Chain →</span></div>
+        </section>
+      </div>
+    `;
+  } else if (activeTab === 'surveys') {
+    tabContent = `
+      <!-- Easy Status Checker Section -->
+      <section class="panel ui-ef7a9dfb" style="margin-top: 0;">
+        <div class="section-top">
+          <div>
+            <h2>Survey Number Status Checker <span class="count">${checklists.length}</span></h2>
+            <p>Check document collection, verification, and match status across every survey number.</p>
+          </div>
+          <div class="ui-bc6560f4">
+            <label class="search-box">
+              ${icon('search')}
+              <input id="matrix-search" type="search" placeholder="Filter by survey number, owner..." aria-label="Search survey numbers">
+            </label>
+          </div>
+        </div>
+
+        <div id="matrix-view-container" class="ui-6230a1cf">
+          ${renderStatusMatrix(checklists, p)}
+        </div>
+
+        <div class="panel-footer">
+          ${icon('info')} Completing documents for one survey number (e.g. 216/1) never alters statuses for other survey numbers (e.g. 216/2). Every survey number is tracked independently.
+        </div>
+      </section>
+    `;
+  } else if (activeTab === 'schedule') {
+    tabContent = renderScheduleTableSection(p, scheduleData, {
+      activeVillage: options.activeVillage || 'all',
+      search: options.search || '',
+      sortCol: options.sortCol || 'survey_number',
+      sortDir: options.sortDir || 'asc',
+      page: options.page || 1,
+      userRole: state.profile?.role
+    });
+  } else if (activeTab === 'pr-chain') {
+    tabContent = renderPRChainSection(p, prChains, scheduleData.schedules || [], state.profile?.role);
+  } else if (activeTab === 'deeds') {
+    tabContent = renderAcquisitionDeedsSection(p, deeds, state.profile?.role);
+  } else if (activeTab === 'report') {
+    tabContent = `
+      <section class="panel report-options">
+        <span class="eyebrow">CONSOLIDATED PROJECT REPORT</span>
+        <h2>${esc(p.project_name)} · Documentation & Title Report</h2>
+        <p>Export all project records, survey checklists, schedules, and verified document summaries.</p>
+        <div class="button-group" style="margin-top: 20px;">
+          <button class="button primary" data-export-project="pdf">${icon('download')} Download PDF Report</button>
+          <button class="button" data-export-schedule-excel>${icon('download')} Download Schedule (Excel)</button>
+          <button class="button" data-print-schedule>${icon('clock')} Print Overview</button>
+        </div>
+      </section>
+    `;
+  }
 
   return `
     <a class="back-link" href="#projects">← All Projects</a>
@@ -371,74 +518,245 @@ export function renderProjectDetail(project, matrixData, state) {
       </div>
     </div>
 
-    ${p.archived_at?'<p class="setup-banner">Archived project · records preserved as read-only.</p>':''}
-    <!-- Project Overview Details Panel -->
-    <section class="panel property-info">
-      <div>
-        <span>Owner</span><strong>${esc(p.owner_name || 'Not entered')}</strong></div><div><span>Promoter / Developer</span>
-        <strong>${esc(p.promoter_name || 'Not entered')}</strong>
-      </div>
-      <div>
-        <span>Total Land Extent</span>
-        <strong>${p.total_land_extent ? `${esc(p.total_land_extent)} ${esc(p.measurement_unit)}` : 'To be entered'}</strong>
-      </div>
-      <div>
-        <span>Survey Numbers</span>
-        <strong>${prog.survey_count} Parcels</strong>
-      </div>
-      <div>
-        <span>Project Status</span>
-        <strong class="teal">${badge(p.status || 'Active')}</strong>
-      </div>
-    </section>
-    ${p.project_address ? `<p class="property-remarks"><strong>Address:</strong> ${esc(p.project_address)}</p>` : ''}
-    ${p.description ? `<p class="property-remarks"><strong>Description:</strong> ${esc(p.description)}</p>` : ''}
+    ${p.archived_at ? '<p class="setup-banner">Archived project · records preserved as read-only.</p>' : ''}
 
-    <!-- Authoritative Project Completion Progress -->
-    <div class="checklist-progress">
-      <section class="panel">
-        <div class="progress-label">
-          <h3>Overall Project Collection Progress</h3>
-          <strong>${prog.collection_percentage}%</strong>
-        </div>
-        ${meter(prog.collection_percentage, 'Overall Project Collection')}
-        <p>${prog.collected} of ${prog.required} categories collected <span>·</span> ${prog.pending} pending</p>
-      </section>
-      
-      <section class="panel">
-        <div class="progress-label">
-          <h3>Overall Project Verification Progress</h3>
-          <strong>${prog.verification_percentage}%</strong>
-        </div>
-        ${meter(prog.verification_percentage, 'Overall Project Verification')}
-        <p>${prog.verified} of ${prog.required} categories verified <span>·</span> ${prog.under_review} in review <span>·</span> ${prog.rejected} rejected</p>
-      </section>
+    <!-- Project Overview Navigation (Phase 2 Requirement) -->
+    ${renderProjectSubnav(activeTab)}
+
+    <!-- Dynamic Tab Content -->
+    <div id="project-tab-content">
+      ${tabContent}
     </div>
-
-    <!-- Easy Status Checker Section -->
-    <section class="panel ui-ef7a9dfb">
-      <div class="section-top">
-        <div>
-          <h2>Survey Number Status Checker <span class="count">${checklists.length}</span></h2>
-          <p>Easily check document collection, verification, and match status across every survey number.</p>
-        </div>
-        <div class="ui-bc6560f4">
-          <label class="search-box">
-            ${icon('search')}
-            <input id="matrix-search" type="search" placeholder="Filter by survey number, owner..." aria-label="Search survey numbers">
-          </label>
-        </div>
-      </div>
-
-      <div id="matrix-view-container" class="ui-6230a1cf">
-        ${renderStatusMatrix(checklists, p)}
-      </div>
-
-      <div class="panel-footer">
-        ${icon('info')} Completing documents for one survey number (e.g. 216/1) never alters statuses for other survey numbers (e.g. 216/2). Every survey number is tracked independently.
-      </div>
-    </section>
   `;
+}
+
+export function wireProjectDetail(project, state, rerender) {
+  const p = project;
+
+  // Subnav Tab Click
+  document.querySelectorAll('[data-project-tab]').forEach(btn => {
+    btn.onclick = () => {
+      state.projectActiveTab = btn.dataset.projectTab;
+      if (rerender) rerender();
+    };
+  });
+
+  // Jump Tab links on overview cards
+  document.querySelectorAll('[data-jump-tab]').forEach(el => {
+    el.onclick = () => {
+      state.projectActiveTab = el.dataset.jumpTab;
+      if (rerender) rerender();
+    };
+  });
+
+  // Village filters in schedule tab
+  document.querySelectorAll('[data-village-filter]').forEach(btn => {
+    btn.onclick = () => {
+      state.projectActiveVillage = btn.dataset.villageFilter;
+      state.projectSchedulePage = 1;
+      if (rerender) rerender();
+    };
+  });
+
+  // Schedule live search
+  const scheduleSearch = document.querySelector('#schedule-search-input');
+  if (scheduleSearch) {
+    scheduleSearch.oninput = e => {
+      state.projectScheduleSearch = e.target.value;
+      state.projectSchedulePage = 1;
+      if (rerender) rerender();
+    };
+  }
+
+  // Schedule table sort
+  document.querySelectorAll('.schedule-table th.sortable').forEach(th => {
+    th.onclick = () => {
+      const col = th.dataset.sort;
+      if (state.projectScheduleSortCol === col) {
+        state.projectScheduleSortDir = state.projectScheduleSortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.projectScheduleSortCol = col;
+        state.projectScheduleSortDir = 'asc';
+      }
+      if (rerender) rerender();
+    };
+  });
+
+  // Pagination
+  document.querySelectorAll('[data-schedule-page]').forEach(btn => {
+    btn.onclick = () => {
+      const pg = Number(btn.dataset.schedulePage);
+      if (pg >= 1) {
+        state.projectSchedulePage = pg;
+        if (rerender) rerender();
+      }
+    };
+  });
+
+  // Add Schedule Entry
+  document.querySelector('[data-add-schedule]')?.addEventListener('click', () => {
+    scheduleEntryModal(p, null, async () => {
+      state.projectScheduleData = await api(`/projects/${p.id}/schedules`);
+      if (rerender) rerender();
+    });
+  });
+
+  // Edit Schedule Entry
+  document.querySelectorAll('[data-edit-schedule]').forEach(btn => {
+    btn.onclick = () => {
+      const entryId = btn.dataset.editSchedule;
+      const entry = (state.projectScheduleData?.schedules || []).find(s => s.id === entryId);
+      if (entry) {
+        scheduleEntryModal(p, entry, async () => {
+          state.projectScheduleData = await api(`/projects/${p.id}/schedules`);
+          if (rerender) rerender();
+        });
+      }
+    };
+  });
+
+  // Delete Schedule Entry
+  document.querySelectorAll('[data-delete-schedule]').forEach(btn => {
+    btn.onclick = async () => {
+      const entryId = btn.dataset.deleteSchedule;
+      const entry = (state.projectScheduleData?.schedules || []).find(s => s.id === entryId);
+      if (!window.confirm(`⚠️ Delete Schedule Entry\n\nAre you sure you want to delete survey schedule entry "${entry?.survey_number || 'this entry'}"?`)) return;
+      try {
+        btn.disabled = true;
+        await api(`/projects/${p.id}/schedules/${entryId}`, { method: 'DELETE' });
+        toast('Schedule entry deleted.');
+        state.projectScheduleData = await api(`/projects/${p.id}/schedules`);
+        if (rerender) rerender();
+      } catch (err) {
+        toast(err.message || 'Failed to delete schedule entry.', true);
+        btn.disabled = false;
+      }
+    };
+  });
+
+  // View Schedule Details
+  document.querySelectorAll('[data-view-schedule]').forEach(btn => {
+    btn.onclick = () => {
+      const entryId = btn.dataset.viewSchedule;
+      const entry = (state.projectScheduleData?.schedules || []).find(s => s.id === entryId);
+      if (entry) {
+        scheduleDetailModal(entry, state.projectPRChains || []);
+      }
+    };
+  });
+
+  // Sync Survey Numbers
+  document.querySelector('[data-sync-schedules]')?.addEventListener('click', async e => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    try {
+      const res = await api(`/projects/${p.id}/schedules/sync-from-surveys`, { method: 'POST' });
+      toast(`${res.synced_count} survey number(s) synchronized into schedule.`);
+      state.projectScheduleData = await api(`/projects/${p.id}/schedules`);
+      if (rerender) rerender();
+    } catch (err) {
+      toast(err.message || 'Sync failed.', true);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // Export Excel
+  document.querySelectorAll('[data-export-schedule-excel]').forEach(btn => {
+    btn.onclick = () => {
+      exportScheduleToExcel(p, state.projectScheduleData?.schedules || []);
+    };
+  });
+
+  // Print Schedule
+  document.querySelectorAll('[data-print-schedule]').forEach(btn => {
+    btn.onclick = () => window.print();
+  });
+
+  // Export PDF
+  document.querySelector('[data-export-schedule-pdf]')?.addEventListener('click', () => {
+    window.print();
+  });
+
+  // Add PR Chain
+  document.querySelector('[data-add-pr-chain]')?.addEventListener('click', () => {
+    prChainModal(p, null, state.projectScheduleData?.schedules || [], async () => {
+      state.projectPRChains = await api(`/projects/${p.id}/pr-chains`);
+      if (rerender) rerender();
+    });
+  });
+
+  // Edit PR Chain
+  document.querySelectorAll('[data-edit-pr-chain]').forEach(btn => {
+    btn.onclick = () => {
+      const chainId = btn.dataset.editPrChain;
+      const chain = (state.projectPRChains || []).find(c => c.id === chainId);
+      if (chain) {
+        prChainModal(p, chain, state.projectScheduleData?.schedules || [], async () => {
+          state.projectPRChains = await api(`/projects/${p.id}/pr-chains`);
+          if (rerender) rerender();
+        });
+      }
+    };
+  });
+
+  // Delete PR Chain
+  document.querySelectorAll('[data-delete-pr-chain]').forEach(btn => {
+    btn.onclick = async () => {
+      const chainId = btn.dataset.deletePrChain;
+      if (!window.confirm('⚠️ Delete PR Document Reference\n\nAre you sure you want to remove this previous registration document reference?')) return;
+      try {
+        btn.disabled = true;
+        await api(`/projects/${p.id}/pr-chains/${chainId}`, { method: 'DELETE' });
+        toast('PR document reference deleted.');
+        state.projectPRChains = await api(`/projects/${p.id}/pr-chains`);
+        if (rerender) rerender();
+      } catch (err) {
+        toast(err.message || 'Failed to delete PR document reference.', true);
+        btn.disabled = false;
+      }
+    };
+  });
+
+  // Add Acquisition Deed
+  document.querySelector('[data-add-acquisition-deed]')?.addEventListener('click', () => {
+    acquisitionDeedModal(p, null, async () => {
+      state.projectDeeds = await api(`/projects/${p.id}/acquisition-deeds`);
+      if (rerender) rerender();
+    });
+  });
+
+  // Edit Acquisition Deed
+  document.querySelectorAll('[data-edit-acquisition-deed]').forEach(btn => {
+    btn.onclick = () => {
+      const deedId = btn.dataset.editAcquisitionDeed;
+      const deed = (state.projectDeeds || []).find(d => d.id === deedId);
+      if (deed) {
+        acquisitionDeedModal(p, deed, async () => {
+          state.projectDeeds = await api(`/projects/${p.id}/acquisition-deeds`);
+          if (rerender) rerender();
+        });
+      }
+    };
+  });
+
+  // Delete Acquisition Deed
+  document.querySelectorAll('[data-delete-acquisition-deed]').forEach(btn => {
+    btn.onclick = async () => {
+      const deedId = btn.dataset.deleteAcquisitionDeed;
+      if (!window.confirm('⚠️ Delete Acquisition Deed\n\nAre you sure you want to delete this acquisition deed record?')) return;
+      try {
+        btn.disabled = true;
+        await api(`/projects/${p.id}/acquisition-deeds/${deedId}`, { method: 'DELETE' });
+        toast('Acquisition deed deleted.');
+        state.projectDeeds = await api(`/projects/${p.id}/acquisition-deeds`);
+        if (rerender) rerender();
+      } catch (err) {
+        toast(err.message || 'Failed to delete acquisition deed.', true);
+        btn.disabled = false;
+      }
+    };
+  });
 }
 
 export function unlockProjectModal(project, onUnlocked) {
