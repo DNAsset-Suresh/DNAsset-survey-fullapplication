@@ -185,9 +185,11 @@ async function route(reuseData = false) {
   document.querySelector('.sidebar').classList.remove('mobile-open');
 
   const breadcrumbEl = document.querySelector('#breadcrumb-current');
-  if (page === 'project') breadcrumbEl.textContent = 'Project Overview';
-  else if (page === 'survey') breadcrumbEl.textContent = 'Survey Checklist';
-  else breadcrumbEl.textContent = navigation.find(n => n[0] === page)?.[1] || 'Workspace';
+  if (breadcrumbEl) {
+    if (page === 'project') breadcrumbEl.textContent = 'Project Overview';
+    else if (page === 'survey') breadcrumbEl.textContent = 'Survey Checklist';
+    else breadcrumbEl.textContent = navigation.find(n => n[0] === page)?.[1] || 'Workspace';
+  }
 
   const main = document.querySelector('#main');
   main.setAttribute('aria-busy', 'true');
@@ -250,13 +252,13 @@ async function route(reuseData = false) {
         const project={...matrix.project,progress:matrix.progress};
         state.currentProject = project;
         state.currentMatrix = matrix;
-        breadcrumbEl.textContent = project.project_name || 'Project Details';
+        if (breadcrumbEl) breadcrumbEl.textContent = project.project_name || 'Project Details';
         html = renderProjectDetail(project, matrix, state);
         if(state.profile.role==='admin')html+=`<section class="panel management-panel"><h2>Project management</h2><div class="button-group"><button class="button" data-archive-project="${project.id}" data-archived="${Boolean(project.archived_at)}">${project.archived_at?'Restore project':'Archive project'}</button><button class="button danger" data-delete-scope="project" data-target-id="${project.id}">Review project deletion</button></div></section>`;
       } catch (err) {
         if (err.code === 'PROJECT_PASSWORD_REQUIRED' || err.status === 403) {
           const targetProj = state.projects.find(p => p.id === id) || { id, project_name: 'Protected Project' };
-          breadcrumbEl.textContent = targetProj.project_name || 'Protected Project';
+          if (breadcrumbEl) breadcrumbEl.textContent = targetProj.project_name || 'Protected Project';
           html = renderLockedProjectScreen(targetProj);
           setTimeout(() => {
             unlockProjectModal(targetProj, () => route());
@@ -292,14 +294,14 @@ async function route(reuseData = false) {
       if (state.preview && id !== previewProperty.id) throw new Error('Property not found.');
       try {
         state.checklist = state.preview ? previewChecklist : await api(`/properties/${encodeURIComponent(id)}/checklist`);
-        breadcrumbEl.textContent = `Survey ${state.checklist.property.survey_number}`;
+        if (breadcrumbEl) breadcrumbEl.textContent = `Survey ${state.checklist.property.survey_number}`;
         html = renderChecklist(state.checklist, state);
         if(state.profile.role==='admin'&&!state.preview)html+=`<section class="panel management-panel"><button class="button danger" data-delete-scope="survey" data-target-id="${id}">Review survey deletion</button></section>`;
       } catch (err) {
         if (err.code === 'PROJECT_PASSWORD_REQUIRED' || err.status === 403) {
           const parentProjId = err.projectId || state.properties.find(p => p.id === id)?.project_id;
           const targetProj = state.projects.find(p => p.id === parentProjId) || { id: parentProjId, project_name: 'Protected Project' };
-          breadcrumbEl.textContent = targetProj.project_name || 'Protected Project';
+          if (breadcrumbEl) breadcrumbEl.textContent = targetProj.project_name || 'Protected Project';
           html = renderLockedProjectScreen(targetProj);
           setTimeout(() => {
             unlockProjectModal(targetProj, () => route());
@@ -379,9 +381,13 @@ async function route(reuseData = false) {
     main.innerHTML = html;
     const overviewHost = main.querySelector('#property-overview-host');
     if (overviewHost) {
-      const dispose = await mountPropertyOverview(overviewHost);
-      if (version !== renderVersion) { dispose(); return; }
-      disposeOverview = dispose;
+      try {
+        const dispose = await mountPropertyOverview(overviewHost);
+        if (version !== renderVersion) { dispose?.(); return; }
+        disposeOverview = dispose || (() => {});
+      } catch (overviewErr) {
+        console.error('[PropertyOverview] Error mounting:', overviewErr);
+      }
     }
     main.removeAttribute('aria-busy');
     wire(page, id);

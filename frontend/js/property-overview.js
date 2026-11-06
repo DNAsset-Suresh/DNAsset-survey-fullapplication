@@ -3,6 +3,7 @@ import { NA, STATUSES, columns, text, number, money, extent, landTotal, source, 
 function createOverview(root = document, host = document.body) {
 const lifecycle = new AbortController();
 const $ = selector => root.querySelector(selector);
+const setText = (sel, val) => { const el = typeof sel === 'string' ? $(sel) : sel; if (el) el.textContent = val ?? ''; };
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const value = v => esc(text(v));
 const pill = record => `<span class="pill ${confirmed(record) ? 'green' : status(record) === STATUSES[3] ? 'amber' : 'blue'}">${esc(status(record))}</span>`;
@@ -11,15 +12,16 @@ const empty = (hint, symbol = '◇') => `<div class="empty-state"><span class="e
 const emptyRow = (count, hint) => `<tr><td colspan="${count}" class="empty-cell"><strong>${NA}</strong><p>${esc(hint)}</p></td></tr>`;
 let data, confirmation = 'all', visibleSchedules = [], workbookLibrary;
 let feedbackTimer;
-function feedback(message) { $('#feedback').textContent = message; clearTimeout(feedbackTimer); feedbackTimer = setTimeout(() => { $('#feedback').textContent = ''; }, 7000); }
+function feedback(message) { setText('#feedback', message); clearTimeout(feedbackTimer); feedbackTimer = setTimeout(() => { setText('#feedback', ''); }, 7000); }
 function filters() { return Object.fromEntries(new FormData($('#filter-form'))); }
 function activeFilters() { return Object.values(filters()).some(v => v.trim()) || confirmation !== 'all'; }
 function blankHint(defaultHint) { return activeFilters() ? 'No records match these filters. Clear filters to see all available records.' : defaultHint; }
 function renderOverview() {
   const p = data.project, m = metrics(data);
-  $('#project-title').textContent = text(p.name);
-  $('#project-description').textContent = `Property type: ${text(p.propertyType)} · Location: ${[p.village, p.taluk, p.district, p.state].filter(Boolean).join(', ') || NA}`;
-  $('#hero-meta').innerHTML = [['Current owner', p.currentOwner], ['Land classification', p.landClassification], ['Registration office', p.sro]].map(([label, v]) => `<dl><dt>${label}</dt><dd>${value(v)}</dd></dl>`).join('');
+  setText('#project-title', text(p.name));
+  setText('#project-description', `Property type: ${text(p.propertyType)} · Location: ${[p.village, p.taluk, p.district, p.state].filter(Boolean).join(', ') || NA}`);
+  const heroMeta = $('#hero-meta');
+  if (heroMeta) heroMeta.innerHTML = [['Current owner', p.currentOwner], ['Land classification', p.landClassification], ['Registration office', p.sro]].map(([label, v]) => `<dl><dt>${label}</dt><dd>${value(v)}</dd></dl>`).join('');
   const kpis = [
     ['Total land extent', m.land == null ? NA : `${number(m.land / 43560)} acres`, m.land == null ? 'Acres · Cents · Sq.ft' : `${number(m.land / 435.6)} cents · ${number(m.land)} sq.ft`, '⌗'],
     ['Total extent conveyed', m.conveyed == null ? NA : `${number(m.conveyed / 43560)} acres`, m.conveyed == null ? 'Documented land portions' : `${number(m.conveyed / 435.6)} cents · ${number(m.conveyed)} sq.ft`, '▱'],
@@ -32,45 +34,57 @@ function renderOverview() {
     ['Previous documents', number(m.references), 'Distinct referenced documents', '↗'],
     ['Patta numbers', number(m.pattas), 'Unique numbers by village', '▥']
   ];
-  $('#kpis').innerHTML = kpis.map(([label, v, note, symbol]) => `<article class="kpi"><div class="kpi-top"><span>${label}</span><span class="kpi-icon" aria-hidden="true">${symbol}</span></div><div class="kpi-value ${v === NA ? 'unavailable' : ''}">${esc(v)}</div><div class="kpi-note">${esc(note)}</div></article>`).join('');
+  const kpisEl = $('#kpis');
+  if (kpisEl) kpisEl.innerHTML = kpis.map(([label, v, note, symbol]) => `<article class="kpi"><div class="kpi-top"><span>${label}</span><span class="kpi-icon" aria-hidden="true">${symbol}</span></div><div class="kpi-value ${v === NA ? 'unavailable' : ''}">${esc(v)}</div><div class="kpi-note">${esc(note)}</div></article>`).join('');
   const location = [p.village, p.taluk, p.district, p.state].filter(Boolean).join(', ') || null;
   const summary = [['Property', p.propertyType], ['Location', location], ['Current owner', p.currentOwner], ['Villages involved', number(m.villages)], ['Survey numbers involved', number(m.surveys)], ['Total land extent', landTotal(m.land)], ['Acquisition deeds available', number(m.deeds)], ['Documented property value', money(m.value)], ['Missing documents', data.missingDocuments.map(r => r.description).filter(Boolean).join('; ') || null], ['Items requiring legal verification', data.legalNotes.map(r => r.description).filter(Boolean).join('; ') || null]];
-  $('#management-grid').innerHTML = summary.map(([label, v]) => `<dl><dt>${label}</dt><dd>${value(v)}</dd></dl>`).join('');
+  const mgmtGrid = $('#management-grid');
+  if (mgmtGrid) mgmtGrid.innerHTML = summary.map(([label, v]) => `<dl><dt>${label}</dt><dd>${value(v)}</dd></dl>`).join('');
   const dates = data.deeds.map(r => r.date).filter(Boolean).sort();
-  $('#information-grid').innerHTML = [['Project name', p.name], ['Village name', p.village], ['Village code', p.villageCode], ['Taluk', p.taluk], ['District', p.district], ['State', p.state], ['Property type', p.propertyType], ['Land classification', p.landClassification], ['Current owner', p.currentOwner], ['Previous owners', p.previousOwners], ['Total land extent', landTotal(m.land)], ['Total survey numbers', number(m.surveys)], ['Total patta numbers', number(m.pattas)], ['Sub-Registrar Office (SRO)', p.sro], ['Latest registration date', dates.at(-1)]].map(([label, v]) => field(label, v)).join('');
+  const infoGrid = $('#information-grid');
+  if (infoGrid) infoGrid.innerHTML = [['Project name', p.name], ['Village name', p.village], ['Village code', p.villageCode], ['Taluk', p.taluk], ['District', p.district], ['State', p.state], ['Property type', p.propertyType], ['Land classification', p.landClassification], ['Current owner', p.currentOwner], ['Previous owners', p.previousOwners], ['Total land extent', landTotal(m.land)], ['Total survey numbers', number(m.surveys)], ['Total patta numbers', number(m.pattas)], ['Sub-Registrar Office (SRO)', p.sro], ['Latest registration date', dates.at(-1)]].map(([label, v]) => field(label, v)).join('');
   if (data.documents.length) {
-    $('#document-notice strong').textContent = 'Property document overview';
-    $('#document-notice p').textContent = `${data.documents.length} source record(s) listed. Missing details remain “${NA}”. Review statuses appear on individual records.`;
-    $('#overall-status').textContent = 'Review individual records';
+    setText('#document-notice strong', 'Property document overview');
+    setText('#document-notice p', `${data.documents.length} source record(s) listed. Missing details remain “${NA}”. Review statuses appear on individual records.`);
+    setText('#overall-status', 'Review individual records');
   }
   const coverageTypes = ['Sale deed', 'Parent deed', 'Encumbrance certificate', 'Patta', 'Legal opinion'];
-  $('#coverage').innerHTML = coverageTypes.map(type => {
+  const coverageEl = $('#coverage');
+  if (coverageEl) coverageEl.innerHTML = coverageTypes.map(type => {
     const count = data.documents.filter(d => d.type === type).length;
     return `<div class="coverage-row"><span>${type}</span><span>${count ? `${count} supplied` : NA}</span></div>`;
   }).join('');
   const reviewNotes = records => records.map(r => `<div class="review-note"><strong>${value(r.description)}</strong><p>${value(r.details)}</p><p>${esc(source(r))}</p></div>`).join('');
-  $('#missing-documents').innerHTML = data.missingDocuments.length ? reviewNotes(data.missingDocuments) : empty('Document gaps can be identified once the supplied records have been examined.', '▤');
-  $('#legal-notes').innerHTML = data.legalNotes.length ? reviewNotes(data.legalNotes) : empty('Record conflicts and ownership links will be listed here for advocate verification.');
+  const missingEl = $('#missing-documents');
+  if (missingEl) missingEl.innerHTML = data.missingDocuments.length ? reviewNotes(data.missingDocuments) : empty('Document gaps can be identified once the supplied records have been examined.', '▤');
+  const legalEl = $('#legal-notes');
+  if (legalEl) legalEl.innerHTML = data.legalNotes.length ? reviewNotes(data.legalNotes) : empty('Record conflicts and ownership links will be listed here for advocate verification.');
 }
 function renderDeeds(deeds) {
-  $('#deed-count').textContent = data.deeds.length ? `${deeds.length} of ${data.deeds.length} records` : 'Awaiting records';
+  setText('#deed-count', data.deeds.length ? `${deeds.length} of ${data.deeds.length} records` : 'Awaiting records');
   const card = (d, placeholder = false) => `<article class="deed-card ${placeholder ? 'empty-deed' : ''}"><div class="deed-header"><span class="deed-icon" aria-hidden="true">▣</span><div><div class="eyebrow">${placeholder ? 'ACQUISITION RECORD' : value(d.type)}</div><h3>${value(d.documentNumber)}</h3></div></div><dl class="deed-grid">${[['Registration year', d.year], ['Registration date', d.date], ['Sub-Registrar Office', d.sro], ['Document type', d.type], ['Seller', d.seller], ['Purchaser', d.purchaser], ['Previous document', d.previousDocument], ['Property extent', extent(d.extent)], ['Registration / schedule value', money(d.value)], ['Related survey numbers', d.surveyNumbers]].map(([label, v]) => `<div><dt>${label}</dt><dd>${value(v)}</dd></div>`).join('')}</dl><div class="deed-footer">${placeholder ? '<span>Awaiting a supplied acquisition deed</span>' : pill(d)}<span>${esc(source(d))}</span></div></article>`;
-  $('#deed-cards').innerHTML = deeds.length ? chronological(deeds).map(d => card(d)).join('') : data.deeds.length || activeFilters() ? `<div class="panel">${empty(blankHint('No acquisition records are available.'))}</div>` : `${card({}, true)}<div class="deed-explanation">${empty('Acquisition deeds will appear in chronological order with parties, extents, values and source references.', '↗')}</div>`;
+  const deedCards = $('#deed-cards');
+  if (deedCards) deedCards.innerHTML = deeds.length ? chronological(deeds).map(d => card(d)).join('') : data.deeds.length || activeFilters() ? `<div class="panel">${empty(blankHint('No acquisition records are available.'))}</div>` : `${card({}, true)}<div class="deed-explanation">${empty('Acquisition deeds will appear in chronological order with parties, extents, values and source references.', '↗')}</div>`;
 }
 function renderRecords() {
   const f = filters(), filtered = name => data[name].filter(r => matches(r, f));
   const deeds = filtered('deeds'), rows = filtered('schedules').filter(r => confirmation === 'all' || (confirmation === 'confirmed' ? confirmed(r) : !confirmed(r)));
   visibleSchedules = rows;
   renderDeeds(deeds);
-  $('#schedule-body').innerHTML = rows.length ? scheduleRows(rows).map((row, i) => `<tr>${row.map((cell, col) => `<td>${col === 10 ? pill(rows[i]) : col === 3 && rows[i].subdivision ? `<span class="subdivision">${esc(cell)}</span>` : (col === 6 || col === 8) && cell === NA ? `<span class="missing">${NA}<br>Missing / To Confirm</span>` : esc(cell)}</td>`).join('')}</tr>`).join('') : emptyRow(columns.length, blankHint('Survey entries will appear here after document analysis. No survey numbers or land portions have been assumed.'));
-  $('#schedule-totals').innerHTML = `<tr>${totalsRow(rows).map(cell => `<td>${esc(cell)}</td>`).join('')}</tr>`;
+  const schedBody = $('#schedule-body');
+  if (schedBody) schedBody.innerHTML = rows.length ? scheduleRows(rows).map((row, i) => `<tr>${row.map((cell, col) => `<td>${col === 10 ? pill(rows[i]) : col === 3 && rows[i].subdivision ? `<span class="subdivision">${esc(cell)}</span>` : (col === 6 || col === 8) && cell === NA ? `<span class="missing">${NA}<br>Missing / To Confirm</span>` : esc(cell)}</td>`).join('')}</tr>`).join('') : emptyRow(columns.length, blankHint('Survey entries will appear here after document analysis. No survey numbers or land portions have been assumed.'));
+  const schedTotals = $('#schedule-totals');
+  if (schedTotals) schedTotals.innerHTML = `<tr>${totalsRow(rows).map(cell => `<td>${esc(cell)}</td>`).join('')}</tr>`;
   const owners = chronological(filtered('ownership'));
-  $('#ownership-timeline').innerHTML = owners.length ? `<ol class="timeline">${owners.map(r => `<li><time>${value(r.date || r.year)}</time><h3>${value(r.fromOwner)} → ${value(r.toOwner)}</h3><p>${value(r.type)} · ${value(r.documentNumber)}</p><p>${value(r.connection)} · ${esc(source(r))}</p>${pill(r)}${confirmed(r) ? '' : '<p>Unverified ownership connection — advocate review required.</p>'}</li>`).join('')}</ol>` : empty(blankHint('Original owner → previous owner → intermediate purchaser → current owner. The chain will be populated only from supplied records.'), '⌁');
+  const timeline = $('#ownership-timeline');
+  if (timeline) timeline.innerHTML = owners.length ? `<ol class="timeline">${owners.map(r => `<li><time>${value(r.date || r.year)}</time><h3>${value(r.fromOwner)} → ${value(r.toOwner)}</h3><p>${value(r.type)} · ${value(r.documentNumber)}</p><p>${value(r.connection)} · ${esc(source(r))}</p>${pill(r)}${confirmed(r) ? '' : '<p>Unverified ownership connection — advocate review required.</p>'}</li>`).join('')}</ol>` : empty(blankHint('Original owner → previous owner → intermediate purchaser → current owner. The chain will be populated only from supplied records.'), '⌁');
   const refs = filtered('references');
-  $('#references-body').innerHTML = refs.length ? refs.map(r => `<tr>${[r.documentNumber, r.year, r.type, r.surveyNumber, r.parentDeed, r.connection].map(v => `<td>${value(v)}</td>`).join('')}<td>${pill(r)}</td><td>${esc(source(r))}</td></tr>`).join('') : emptyRow(8, blankHint('Parent deeds and previous-document references will be listed with their verification status.'));
+  const refsBody = $('#references-body');
+  if (refsBody) refsBody.innerHTML = refs.length ? refs.map(r => `<tr>${[r.documentNumber, r.year, r.type, r.surveyNumber, r.parentDeed, r.connection].map(v => `<td>${value(v)}</td>`).join('')}<td>${pill(r)}</td><td>${esc(source(r))}</td></tr>`).join('') : emptyRow(8, blankHint('Parent deeds and previous-document references will be listed with their verification status.'));
   const pattas = filtered('pattas');
-  $('#patta-body').innerHTML = pattas.length ? pattas.map(r => `<tr>${[r.pattaNumber, r.owner, r.village, [r.surveyNumber, r.subdivision].filter(Boolean).join('/'), extent(r.extent)].map(v => `<td>${value(v)}</td>`).join('')}<td>${pill(r)}</td><td>${esc(source(r))}</td></tr>`).join('') : emptyRow(7, blankHint('No patta records have been supplied for this overview.'));
-  $('#filter-status').textContent = activeFilters() ? `${rows.length} matching schedule entries · ${deeds.length} deeds · ${owners.length} ownership entries · ${refs.length} PR references · ${pattas.length} patta records. Project KPIs remain unchanged.` : 'Filters apply to deeds, schedules, ownership, PR and patta records. Project KPIs show the full project.';
+  const pattaBody = $('#patta-body');
+  if (pattaBody) pattaBody.innerHTML = pattas.length ? pattas.map(r => `<tr>${[r.pattaNumber, r.owner, r.village, [r.surveyNumber, r.subdivision].filter(Boolean).join('/'), extent(r.extent)].map(v => `<td>${value(v)}</td>`).join('')}<td>${pill(r)}</td><td>${esc(source(r))}</td></tr>`).join('') : emptyRow(7, blankHint('No patta records have been supplied for this overview.'));
+  setText('#filter-status', activeFilters() ? `${rows.length} matching schedule entries · ${deeds.length} deeds · ${owners.length} ownership entries · ${refs.length} PR references · ${pattas.length} patta records. Project KPIs remain unchanged.` : 'Filters apply to deeds, schedules, ownership, PR and patta records. Project KPIs show the full project.');
   root.querySelectorAll('[data-confirmation]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.confirmation === confirmation)));
 }
 function populateFilters() {
@@ -148,8 +162,8 @@ async function start() {
     if (data.schemaVersion !== 1 || !data.project || !['documents', 'deeds', 'schedules', 'ownership', 'references', 'pattas', 'missingDocuments', 'legalNotes'].every(key => Array.isArray(data[key]) && data[key].every(r => r && typeof r === 'object'))) throw new Error('The overview dataset has an unsupported format.');
     renderOverview(); populateFilters(); renderRecords(); wire();
   } catch (error) {
-    $('#document-notice strong').textContent = 'Overview unavailable';
-    $('#document-notice p').textContent = error.message;
+    setText('#document-notice strong', 'Overview unavailable');
+    setText('#document-notice p', error.message);
     root.querySelectorAll('button, input, select').forEach(element => element.disabled = true);
   }
 }
@@ -159,18 +173,33 @@ return { start, dispose() { lifecycle.abort(); clearTimeout(feedbackTimer); dele
 // Mount the same dashboard inside the survey workspace without duplicate navigation
 // or global CSS changes. It shares the current app session; no iframe is required.
 export async function mountPropertyOverview(host) {
-  const response = await fetch('/property_dashboard.html');
-  if (!response.ok) throw new Error('The property overview could not be opened. Please try again.');
-  const template = new DOMParser().parseFromString(await response.text(), 'text/html');
-  if (!host.isConnected) return () => {};
-  template.querySelectorAll('.sidebar, .topbar, footer, .skip-link, script').forEach(element => element.remove());
-  const root = host.attachShadow({ mode: 'open' });
-  const stylesheet = document.createElement('link');
-  stylesheet.rel = 'stylesheet'; stylesheet.href = '/css/property-overview.css';
-  root.append(stylesheet, ...template.body.childNodes);
-  const overview = createOverview(root, host);
-  await overview.start();
-  return overview.dispose;
+  if (!host || !host.isConnected) return () => {};
+  try {
+    const response = await fetch('/property_dashboard.html');
+    if (!response.ok) throw new Error('The property overview could not be opened. Please try again.');
+    const template = new DOMParser().parseFromString(await response.text(), 'text/html');
+    if (!host.isConnected) return () => {};
+    template.querySelectorAll('.sidebar, .topbar, footer, .skip-link, script').forEach(element => element.remove());
+    let root = host.shadowRoot;
+    if (!root) {
+      root = host.attachShadow({ mode: 'open' });
+    } else {
+      root.innerHTML = '';
+    }
+    const stylesheet = document.createElement('link');
+    stylesheet.rel = 'stylesheet'; stylesheet.href = '/css/property-overview.css';
+    root.appendChild(stylesheet);
+    const bodyChildren = Array.from(template.body.childNodes);
+    for (const node of bodyChildren) {
+      root.appendChild(document.importNode(node, true));
+    }
+    const overview = createOverview(root, host);
+    await overview.start();
+    return overview.dispose;
+  } catch (err) {
+    console.error('[PropertyOverview] Mount failed:', err);
+    return () => {};
+  }
 }
 
 if (document.querySelector('#project-title')) createOverview().start();
