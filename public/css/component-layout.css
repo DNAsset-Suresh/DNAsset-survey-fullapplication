@@ -51,6 +51,5 @@
 .sidebar nav{overflow-y:auto;min-height:0}.sidebar{max-height:100dvh}.panel+.panel{margin-top:24px}
 @media(max-width:600px){.record-filters{grid-template-columns:1fr;padding:16px}.deletion-counts{grid-template-columns:1fr}.management-panel{padding:16px}.management-panel .form-grid{grid-template-columns:1fr}.record-filters .button-group{flex-wrap:wrap}}
 
-/* Property overview lives inside the authenticated survey workspace. */
-#main.property-overview-view{padding:0;max-width:none;background:#0a1220}.page-heading .button-group{flex-wrap:wrap}
-@media print{#main.property-overview-view{background:white}}
+/* Property overview embedded on the Dashboard */
+.dashboard-property-overview{display:block;margin:24px 0;border-radius:var(--radius);overflow:hidden;background:#0a1220;border:1px solid var(--border)}.page-heading .button-group{flex-wrap:wrap}

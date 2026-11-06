@@ -80,7 +80,6 @@ export function renderDashboard(projects, properties, summary, activeMatrix, cur
         <p>A unified hierarchy: Project Name is the main record holding multiple survey numbers.</p>
       </div>
       <div class="button-group">
-        <a class="button" href="#property-overview">${icon('reports')} Property Overview</a>
         <button class="button primary" data-add-project>${icon('plus')} Add New Project</button>
         <button class="button" data-add-survey>${icon('plus')} Add Survey Number</button>
       </div>
@@ -189,6 +188,9 @@ export function renderDashboard(projects, properties, summary, activeMatrix, cur
               : '<p class="loading-state">Loading status matrix…</p>')}
       </div>
     </section>
+
+    <!-- Property Document Overview embedded in Dashboard -->
+    <div id="property-overview-host" class="dashboard-property-overview"></div>
 
     <!-- Project Register Table as required by Prompt Section 5 -->
     <section class="panel ui-3e43f6f8">

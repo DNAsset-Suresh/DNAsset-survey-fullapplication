@@ -24,7 +24,6 @@ const state = {
 
 const navigation = [
   ['dashboard', 'Dashboard'],
-  ['property-overview', 'Property Overview'],
   ['projects', 'Projects'],
   ['surveys', 'Survey numbers'],
   ['documents', 'Document Checklist'],
@@ -37,7 +36,6 @@ const navigation = [
 
 const navIcon = {
   dashboard: 'dashboard',
-  'property-overview': 'reports',
   projects: 'folder',
   surveys: 'survey',
   documents: 'documents',
@@ -170,7 +168,7 @@ async function route(reuseData = false) {
     location.hash = '#documents';
     return;
   }
-  if (page === 'users') {
+  if (page === 'users' || page === 'property-overview') {
     location.hash = '#dashboard';
     return;
   }
@@ -192,7 +190,6 @@ async function route(reuseData = false) {
   else breadcrumbEl.textContent = navigation.find(n => n[0] === page)?.[1] || 'Workspace';
 
   const main = document.querySelector('#main');
-  main.classList.toggle('property-overview-view', page === 'property-overview');
   main.setAttribute('aria-busy', 'true');
   main.innerHTML = '<div class="loading-state">Loading your records…</div>';
 
@@ -206,8 +203,6 @@ async function route(reuseData = false) {
 
     if (['history','audit','database'].includes(page)) {
       html=await renderManagement(page,id,state);
-    } else if (page === 'property-overview') {
-      html = '<div id="property-overview-host"></div>';
     } else if (page === 'dashboard') {
       const summary = state.preview ? { properties: 1, ...previewProperty.progress } : await api('/reports/summary');
       let matrix = null;
@@ -382,8 +377,9 @@ async function route(reuseData = false) {
 
     if (version !== renderVersion) return;
     main.innerHTML = html;
-    if (page === 'property-overview') {
-      const dispose = await mountPropertyOverview(main.querySelector('#property-overview-host'));
+    const overviewHost = main.querySelector('#property-overview-host');
+    if (overviewHost) {
+      const dispose = await mountPropertyOverview(overviewHost);
       if (version !== renderVersion) { dispose(); return; }
       disposeOverview = dispose;
     }
