@@ -1,16 +1,16 @@
-import './firebase.js?v=1.1.0';
-import {renderManagement,wireManagement,renderRecentActivity,reviewRows} from './management.js?v=1.1.0';
-import { api, hasSession } from './api.js?v=1.1.0';
-import { loginScreen, logout } from './auth.js?v=1.1.0';
-import { esc, icon, toast, modal, date, badge, empty, meter } from './ui.js?v=1.1.0';
-import { previewProperty, previewChecklist } from './preview.js?v=1.1.0';
-import { renderDashboard, surveyTable, locationText } from './dashboard.js?v=1.1.0';
-import { mountPropertyOverview } from './property-overview.js?v=1.1.0';
-import { propertyForm } from './surveys.js?v=1.1.0';
-import { renderChecklist, reviewDialog } from './checklist.js?v=1.1.0';
-import { uploadFiles, openFile } from './uploads.js?v=1.1.0';
-import { renderReports, exportReport, emailReport } from './reports.js?v=1.1.0';
-import { projectModal, surveyModal, renderProjectTable, renderProjectDetail, renderStatusMatrix, renderLockedProjectScreen, unlockProjectModal } from './projects.js?v=1.1.0';
+import './firebase.js?v=1.1.1';
+import {renderManagement,wireManagement,renderRecentActivity,reviewRows} from './management.js?v=1.1.1';
+import { api, hasSession } from './api.js?v=1.1.1';
+import { loginScreen, logout } from './auth.js?v=1.1.1';
+import { esc, icon, toast, modal, date, badge, empty, meter } from './ui.js?v=1.1.1';
+import { previewProperty, previewChecklist } from './preview.js?v=1.1.1';
+import { renderDashboard, surveyTable, locationText } from './dashboard.js?v=1.1.1';
+import { mountPropertyOverview } from './property-overview.js?v=1.1.1';
+import { propertyForm } from './surveys.js?v=1.1.1';
+import { renderChecklist, reviewDialog } from './checklist.js?v=1.1.1';
+import { uploadFiles, openFile } from './uploads.js?v=1.1.1';
+import { renderReports, exportReport, emailReport } from './reports.js?v=1.1.1';
+import { projectModal, surveyModal, renderProjectTable, renderProjectDetail, renderStatusMatrix, renderLockedProjectScreen, unlockProjectModal } from './projects.js?v=1.1.1';
 
 const state = {
   preview: false,
@@ -24,6 +24,7 @@ const state = {
 
 const navigation = [
   ['dashboard', 'Dashboard'],
+  ['property-overview', 'Property Overview'],
   ['projects', 'Projects'],
   ['surveys', 'Survey numbers'],
   ['documents', 'Document Checklist'],
@@ -36,6 +37,7 @@ const navigation = [
 
 const navIcon = {
   dashboard: 'dashboard',
+  'property-overview': 'reports',
   projects: 'folder',
   surveys: 'survey',
   documents: 'documents',
@@ -168,7 +170,7 @@ async function route(reuseData = false) {
     location.hash = '#documents';
     return;
   }
-  if (page === 'users' || page === 'property-overview') {
+  if (page === 'users') {
     location.hash = '#dashboard';
     return;
   }
@@ -187,11 +189,13 @@ async function route(reuseData = false) {
   const breadcrumbEl = document.querySelector('#breadcrumb-current');
   if (breadcrumbEl) {
     if (page === 'project') breadcrumbEl.textContent = 'Project Overview';
+    else if (page === 'property-overview') breadcrumbEl.textContent = 'Property Overview';
     else if (page === 'survey') breadcrumbEl.textContent = 'Survey Checklist';
     else breadcrumbEl.textContent = navigation.find(n => n[0] === page)?.[1] || 'Workspace';
   }
 
   const main = document.querySelector('#main');
+  main.classList.toggle('property-overview-view', page === 'property-overview');
   main.setAttribute('aria-busy', 'true');
   main.innerHTML = '<div class="loading-state">Loading your records…</div>';
 
@@ -205,6 +209,8 @@ async function route(reuseData = false) {
 
     if (['history','audit','database'].includes(page)) {
       html=await renderManagement(page,id,state);
+    } else if (page === 'property-overview') {
+      html = '<div id="property-overview-host"></div>';
     } else if (page === 'dashboard') {
       const summary = state.preview ? { properties: 1, ...previewProperty.progress } : await api('/reports/summary');
       let matrix = null;
