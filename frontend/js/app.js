@@ -5,6 +5,7 @@ import { loginScreen, logout } from './auth.js';
 import { esc, icon, toast, modal, date, badge, empty, meter } from './ui.js';
 import { previewProperty, previewChecklist } from './preview.js';
 import { renderDashboard, surveyTable, locationText } from './dashboard.js';
+import { mountPropertyOverview } from './property-overview.js';
 import { propertyForm } from './surveys.js';
 import { renderChecklist, reviewDialog } from './checklist.js';
 import { uploadFiles, openFile } from './uploads.js?v=1.0.1';
@@ -23,13 +24,12 @@ const state = {
 
 const navigation = [
   ['dashboard', 'Dashboard'],
+  ['property-overview', 'Property Overview'],
   ['projects', 'Projects'],
   ['surveys', 'Survey numbers'],
   ['documents', 'Document Checklist'],
   ['history', 'Upload History'],
-  ['verification', 'Review Management'],
   ['audit', 'Audit Logs'],
-  ['users', 'User Management'],
   ['database', 'Database Management'],
   ['reports', 'Reports'],
   ['settings', 'Settings']
@@ -37,15 +37,16 @@ const navigation = [
 
 const navIcon = {
   dashboard: 'dashboard',
+  'property-overview': 'reports',
   projects: 'folder',
   surveys: 'survey',
   documents: 'documents',
-  verification: 'verification',
   reports: 'reports',
   settings: 'settings'
 };
 
 let renderVersion = 0;
+let disposeOverview = () => {};
 const previewNotice = () => toast('This is a read-only preview. Configure Supabase to save and manage records.');
 const canEdit = () => !state.preview && !state.checklist?.property?.project_archived_at && state.profile?.role === 'admin';
 const canAddSurvey = () => !state.preview && !state.checklist?.property?.project_archived_at && ['admin', 'reviewer'].includes(state.profile?.role);
@@ -60,7 +61,7 @@ function shell() {
         </a>
         <div class="workspace-label">WORKSPACE</div>
         <nav aria-label="Main navigation">
-          ${navigation.filter(([key])=>!['audit','users','database'].includes(key)||state.profile.role==='admin').map(([key, label]) => `
+          ${navigation.filter(([key])=>!['audit','database'].includes(key)||state.profile.role==='admin').map(([key, label]) => `
             <a href="#${key}" data-nav="${key}">
               ${icon(navIcon[key] || key)}
               <span>${label}</span>
@@ -165,6 +166,16 @@ async function route(reuseData = false) {
   if (!document.querySelector('#main')) return;
   const version = ++renderVersion;
   const [page = 'dashboard', id] = (location.hash.slice(1) || 'dashboard').split('/');
+  if (page === 'verification') {
+    location.hash = '#documents';
+    return;
+  }
+  if (page === 'users') {
+    location.hash = '#dashboard';
+    return;
+  }
+  disposeOverview();
+  disposeOverview = () => {};
   const active = page === 'survey' ? 'surveys' : page === 'project' ? 'projects' : page;
 
   document.querySelectorAll('[data-nav]').forEach(a => {
@@ -181,6 +192,7 @@ async function route(reuseData = false) {
   else breadcrumbEl.textContent = navigation.find(n => n[0] === page)?.[1] || 'Workspace';
 
   const main = document.querySelector('#main');
+  main.classList.toggle('property-overview-view', page === 'property-overview');
   main.setAttribute('aria-busy', 'true');
   main.innerHTML = '<div class="loading-state">Loading your records…</div>';
 
@@ -192,8 +204,10 @@ async function route(reuseData = false) {
     state.currentProject = null;
     state.currentMatrix = null;
 
-    if (['history','audit','users','database'].includes(page)) {
+    if (['history','audit','database'].includes(page)) {
       html=await renderManagement(page,id,state);
+    } else if (page === 'property-overview') {
+      html = '<div id="property-overview-host"></div>';
     } else if (page === 'dashboard') {
       const summary = state.preview ? { properties: 1, ...previewProperty.progress } : await api('/reports/summary');
       let matrix = null;
@@ -299,25 +313,24 @@ async function route(reuseData = false) {
           throw err;
         }
       }
-    } else if (page === 'documents' || page === 'verification') {
+    } else if (page === 'documents') {
       const offset=Math.max(0,Number(id)||0);
       const documentPage=state.preview?{checklists:[previewChecklist],hasMore:false,locked:0}:await api(`/checklists?offset=${offset}&limit=25`);
       const sets=documentPage.checklists;
       const rows = sets.flatMap(s => s.documents.map(d => ({ ...d, property: s.property })));
-      const review = page === 'verification';
-      const filtered = review ? rows.filter(d => d.files.length) : rows;
+      const filtered = rows;
       html = `
         <div class="page-heading">
           <div>
-            <span class="eyebrow">${review ? 'HUMAN REVIEW, RECORDED' : 'YOUR DOCUMENT LIBRARY'}</span>
-            <h1>${review ? 'Verification' : 'Documents'}<span class="heading-dot">.</span></h1>
-            <p>${review ? 'Review uploaded records and capture a clear decision.' : 'Every required category, organized by property.'} Showing up to 25 surveys per page.</p>
+            <span class="eyebrow">YOUR DOCUMENT LIBRARY</span>
+            <h1>Documents<span class="heading-dot">.</span></h1>
+            <p>Every required category, organized by property. Showing up to 25 surveys per page.</p>
             ${documentPage.locked?'<p>Some projects need an access password. <a href="#projects">Open Projects to unlock them.</a></p>':''}
           </div>
         </div>
         <section class="panel">
           <div class="section-top">
-            <h2>${review ? 'Review queue' : 'Document register'} <span class="count">${filtered.length}</span></h2>
+            <h2>Document register <span class="count">${filtered.length}</span></h2>
             <div class="button-group">${offset?`<a class="button" href="#${page}/${Math.max(0,offset-25)}">Previous</a>`:''}${documentPage.hasMore?`<a class="button" href="#${page}/${offset+25}">Next</a>`:''}</div>
           </div>
           ${filtered.length ? `
@@ -352,13 +365,12 @@ async function route(reuseData = false) {
                 </tbody>
               </table>
             </div>
-          ` : empty('No documents awaiting review', 'Upload a document from a property checklist to begin.')}
+          ` : empty('No documents found', 'Upload a document from a property checklist to begin.')}
           <div class="panel-footer">
-            ${icon('info')} ${review ? 'Only admins and assigned reviewers can record verification decisions.' : 'Files are stored privately and opened through short-lived signed links.'}
+            ${icon('info')} Files are stored privately and opened through short-lived signed links.
           </div>
         </section>
       `;
-      if(review&&!state.preview){const events=await api('/reviews?limit=50');html+='<section class="panel"><div class="section-top"><h2>Latest review decisions</h2></div>'+reviewRows(events.rows)+'</section>';}
     } else if (page === 'reports') {
       html = renderReports(state.properties);
     } else if (page === 'settings') {
@@ -370,6 +382,11 @@ async function route(reuseData = false) {
 
     if (version !== renderVersion) return;
     main.innerHTML = html;
+    if (page === 'property-overview') {
+      const dispose = await mountPropertyOverview(main.querySelector('#property-overview-host'));
+      if (version !== renderVersion) { dispose(); return; }
+      disposeOverview = dispose;
+    }
     main.removeAttribute('aria-busy');
     wire(page, id);
     wireManagement(page,id,state,route);

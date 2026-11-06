@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "name": null,
+    "village": null,
+    "villageCode": null,
+    "taluk": null,
+    "district": null,
+    "state": null,
+    "propertyType": null,
+    "landClassification": null,
+    "currentOwner": null,
+    "previousOwners": null,
+    "sro": null
+  },
+  "documents": [],
+  "deeds": [],
+  "schedules": [],
+  "ownership": [],
+  "references": [],
+  "pattas": [],
+  "missingDocuments": [],
+  "legalNotes": []
+}

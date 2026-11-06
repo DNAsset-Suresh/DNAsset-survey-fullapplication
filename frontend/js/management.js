@@ -32,12 +32,6 @@ export async function renderManagement(page,id,state) {
       `<section class="panel"><form id="record-filters" class="record-filters">${field('search','Project, survey or username',params)}${field('action','Action',params)}<button class="button primary">Search</button></form>`+
       table(['Date & time','Username / role','Action','Project / survey','Document ID','IP address','Description'],data.rows.map(a=>`<tr><td>${date(a.created_at)}</td><td>${esc(a.actor_name)}<small class="table-small">${esc(a.actor_role)} · ${esc(a.actor_id)}</small></td><td>${esc(a.action)}</td><td>${esc(a.project_name)}<small class="table-small">${esc(a.survey_number)}</small></td><td class="record-id">${esc(a.property_document_id||'—')}</td><td>${esc(a.ip_address||'Not recorded')}</td><td>${esc(a.description)}</td></tr>`))+pager(page,params,data.rows.length===50,50)+'</section>';
   }
-  if(page==='users') {
-    if(state.profile.role!=='admin')return empty('Administrator access required','Only administrators can manage accounts.');
-    const users=await api('/users');
-    return heading('User Management','Manage team roles, names, passwords and property assignments.')+`<section class="panel"><div class="section-top"><h2>${users.length} team accounts</h2><button class="button" data-manage-members>Manage Property Access</button></div>`+
-      table(['Name','Email','Role','Action'],users.map(u=>`<tr><td>${esc(u.full_name)}</td><td>${esc(u.email)}</td><td>${esc(u.role)}</td><td><button class="button small-button" data-admin-edit-user="${u.id}" data-user-email="${esc(u.email)}" data-user-name="${esc(u.full_name)}" data-user-role="${esc(u.role)}">Edit account</button></td></tr>`))+'</section>';
-  }
   if(page==='database') {
     if(state.profile.role!=='admin')return empty('Administrator access required','Database management is restricted to administrators.');
     const [counts,projects,archived,properties]=await Promise.all([api('/management/summary'),api('/projects'),api('/projects?archived=1'),api('/properties')]);
@@ -60,7 +54,7 @@ export function reviewRows(rows) {
 export async function renderRecentActivity() {
   const data=await api('/dashboard/activity');
   return `<section class="panel"><div class="section-top"><h2>Recent uploads</h2><a class="text-link" href="#history">Full upload history →</a></div>${table(['File','Project / survey','Uploaded by','Date'],data.uploads.map(h=>`<tr><td>${esc(h.original_file_name)}</td><td>${esc(h.project_name)} · ${esc(h.survey_number)}</td><td>${esc(h.user_name)}</td><td>${date(h.upload_timestamp)}</td></tr>`))}</section>
-  <section class="panel"><div class="section-top"><h2>Recent reviews</h2><a class="text-link" href="#verification">Review management →</a></div>${reviewRows(data.reviews)}</section>
+  <section class="panel"><div class="section-top"><h2>Recent reviews</h2><a class="text-link" href="#documents">Document checklist →</a></div>${reviewRows(data.reviews)}</section>
   ${data.activities.length?`<section class="panel"><div class="section-top"><h2>Recent activities</h2><a class="text-link" href="#audit">All audit logs →</a></div>${table(['Date','Action','By','Project'],data.activities.map(a=>`<tr><td>${date(a.created_at)}</td><td>${esc(a.description)}</td><td>${esc(a.actor_name)}</td><td>${esc(a.project_name)}</td></tr>`))}</section>`:''}`;
 }
 

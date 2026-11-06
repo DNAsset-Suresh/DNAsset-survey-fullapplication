@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a1220">
+  <meta name="description" content="DNAssets property document overview, acquisition history and survey schedules.">
+  <title>Property Overview | DNAssets</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/property-overview.css">
+  <script type="module" src="/js/property-overview.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#overview">Skip to overview</a>
+  <aside class="sidebar">
+    <a class="brand" href="/#dashboard"><span class="brand-mark">D<span>◦</span></span><span>DNAssets<small>PROPERTY INTELLIGENCE</small></span></a>
+    <div class="workspace-tag"><span class="status-dot"></span> Document workspace</div>
+    <div class="nav-label">PROJECT INTELLIGENCE</div>
+    <nav aria-label="Property overview sections">
+      <a href="#overview" aria-current="location"><span>◫</span> Project overview</a>
+      <a href="#information"><span>▤</span> Property information</a>
+      <a href="#acquisitions"><span>▣</span> Acquisition deeds</a>
+      <a href="#schedule"><span>⊞</span> Survey-wise schedule</a>
+      <a href="#ownership"><span>⌁</span> Ownership history</a>
+      <a href="#references"><span>↗</span> Parent / PR chain</a>
+      <a href="#patta"><span>▥</span> Patta overview</a>
+      <a href="#verification"><span>◇</span> Document verification</a>
+    </nav>
+    <div class="sidebar-bottom"><div class="sidebar-note"><span class="status-dot"></span> Every detail, with a source.<p>A clear view of your property documentation.</p></div><a href="/#projects" class="back-link">← Back to survey workspace</a></div>
+  </aside>
+  <div class="page">
+    <header class="topbar"><div><span class="breadcrumb">Workspace <span>/</span></span> Property Overview</div><span class="workspace-badge"><span class="status-dot"></span> Documentation workspace</span></header>
+    <main id="overview">
+      <div class="page-heading"><div><div class="eyebrow">PROPERTY DOCUMENT INTELLIGENCE</div><h1>A complete view.<br class="mobile-break"> Every property detail.</h1><p>Your project, land schedules and document history in one place.</p></div><div class="heading-actions"><button class="button secondary" id="print-report">Print report</button><details class="export-menu"><summary class="button primary">↓ Export report <span>⌄</span></summary><div class="export-options"><button data-pdf="dashboard">Dashboard PDF</button><button data-pdf="overview">Project overview PDF</button><button id="export-excel">Survey schedule Excel (.xlsx)</button><button id="export-summary">Document summary (.txt)</button><p>PDF opens a print-ready report. Choose “Save as PDF”.</p></div></details></div></div>
+      <div class="notice" id="document-notice"><span class="notice-symbol">i</span><div><strong>Ready for your property documents</strong><p>No property records have been added to this overview. Missing details are shown as “Not Available in Documents”.</p></div><a href="/#projects">Open document workspace ↗</a></div>
+      <section class="panel project-hero" aria-labelledby="project-title"><div class="hero-content"><div class="eyebrow"><span class="status-dot"></span> PROJECT OVERVIEW</div><h2 id="project-title">Not Available in Documents</h2><p id="project-description">Property type and location: Not Available in Documents</p><div class="hero-meta" id="hero-meta"></div></div><div class="hero-status"><div class="status-symbol">◇</div><span class="pill amber" id="overall-status">Awaiting source records</span><p>Source documents establish the facts.<br>Review establishes confidence.</p></div></section>
+      <section class="kpis" id="kpis" aria-label="Project key figures"></section>
+      <section class="panel section" id="management-summary"><div class="section-heading"><div><div class="eyebrow">AT A GLANCE</div><h2>Management summary</h2></div><span class="muted small">Document-based findings</span></div><div id="management-grid" class="management-grid"></div></section>
+      <section class="panel section" id="information"><div class="section-heading"><div><div class="eyebrow">THE PROPERTY</div><h2>Project information</h2></div><span class="pill blue">Source-linked details</span></div><dl class="info-grid" id="information-grid"></dl></section>
+      <section class="panel section filters-panel" id="filters"><div class="section-heading"><div><div class="eyebrow">EXPLORE THE RECORDS</div><h2>Search & filters</h2></div><button class="text-button" id="clear-filters">Clear filters ↺</button></div><form id="filter-form"><label class="search-field"><span>Search records</span><input type="search" name="search" placeholder="Survey, patta, document, PR number or owner name…" autocomplete="off"></label><div class="filter-grid"><label>Village<select name="village"><option value="">All villages</option></select></label><label>Registration year<select name="year"><option value="">All years</option></select></label><label>Document type<select name="type"><option value="">All document types</option></select></label><label>Verification status<select name="status"><option value="">All statuses</option></select></label></div></form><p class="filter-help" id="filter-status" role="status">Filters apply to deeds, schedules, ownership, PR and patta records. Project KPIs show the full project.</p></section>
+      <section class="section" id="acquisitions"><div class="section-heading"><div><div class="eyebrow">ACQUISITION REGISTER</div><h2>Acquisition deed overview <span class="record-count" id="deed-count">Awaiting records</span></h2></div><span class="muted small">Oldest → newest registration</span></div><div id="deed-cards" class="deed-cards"></div></section>
+      <section class="panel section" id="schedule"><div class="section-heading"><div><div class="eyebrow">LAND & SCHEDULES</div><h2>Survey-wise document overview</h2><p>Distinct portions remain separate. Original measurements are retained.</p></div><button class="button secondary" id="schedule-excel">↓ Excel export</button></div><div class="table-toolbar"><div class="segmented" role="group" aria-label="Schedule confirmation filter"><button data-confirmation="all" aria-pressed="true">All entries</button><button data-confirmation="confirmed" aria-pressed="false">Confirmed</button><button data-confirmation="unconfirmed" aria-pressed="false">Unconfirmed</button></div><span class="small muted">Scroll horizontally for all columns →</span></div><div class="table-scroll" tabindex="0" role="region" aria-label="Survey schedule"><table id="schedule-table"><thead><tr><th>S.No</th><th>Village</th><th>Survey number</th><th>Subdivision</th><th>Total extent</th><th>Conveyed extent</th><th>Patta number</th><th>Root / parent deed</th><th>Previous document (PR)</th><th>Document value</th><th>Verification</th><th>Source / page</th></tr></thead><tbody id="schedule-body"></tbody><tfoot id="schedule-totals"></tfoot></table></div><p class="table-note">Totals reflect visible entries. Land totals count each identified parcel once; schedule values must be allocated to distinct portions. Incomplete or conflicting measurements are not treated as zero.</p></section>
+      <section class="panel section" id="ownership"><div class="section-heading"><div><div class="eyebrow">DOCUMENT CHRONOLOGY</div><h2>Ownership & document history</h2></div><span class="pill amber">Links require verification</span></div><div id="ownership-timeline"></div><p class="table-note">A previous-document reference alone does not establish ownership. Unverified connections require advocate review.</p></section>
+      <section class="panel section" id="references"><div class="section-heading"><div><div class="eyebrow">TRACE THE REFERENCES</div><h2>Parent document / PR chain</h2></div></div><div class="table-scroll" tabindex="0" role="region" aria-label="Previous document references"><table><thead><tr><th>PR document</th><th>Year</th><th>Document type</th><th>Survey number</th><th>Root / parent document</th><th>Ownership connection</th><th>Verification status</th><th>Source / page</th></tr></thead><tbody id="references-body"></tbody></table></div></section>
+      <section class="panel section" id="patta"><div class="section-heading"><div><div class="eyebrow">REVENUE RECORDS</div><h2>Patta overview</h2></div><span class="muted small">Compare with the deed and EC</span></div><div class="table-scroll" tabindex="0" role="region" aria-label="Patta records"><table><thead><tr><th>Patta number</th><th>Recorded holder</th><th>Village</th><th>Survey / subdivision</th><th>Original extent</th><th>Verification</th><th>Source / page</th></tr></thead><tbody id="patta-body"></tbody></table></div></section>
+      <section class="section" id="verification"><div class="section-heading"><div><div class="eyebrow">COMPLETENESS & CONFIDENCE</div><h2>Document verification summary</h2></div></div><div class="verification-layout"><div class="panel verification-card"><h3>Document coverage</h3><div id="coverage"></div></div><div class="panel verification-card"><h3>Missing documents & references</h3><div id="missing-documents"></div></div><div class="panel verification-card"><h3>Legal verification notes</h3><div id="legal-notes"></div></div></div></section>
+      <div class="disclaimer"><span>◇</span><p>This dashboard is a documentation overview, not a legal title-clearance certificate. Ownership connections, conflicting records and title questions require advocate verification.</p></div>
+    </main>
+    <footer><span>DNAssets <span class="footer-divider">/</span> Property intelligence</span><span>Every detail. Every document. One overview.</span></footer>
+  </div>
+  <div id="feedback" role="status" aria-live="polite"></div>
+</body>
+</html>
