@@ -130,25 +130,31 @@ function printReport(mode) {
   window.print();
 }
 function wire() {
-  $('#filter-form').addEventListener('submit', event => event.preventDefault());
-  $('#filter-form').addEventListener('input', renderRecords);
-  $('#clear-filters').onclick = () => { $('#filter-form').reset(); confirmation = 'all'; renderRecords(); };
+  $('#filter-form')?.addEventListener('submit', event => event.preventDefault());
+  $('#filter-form')?.addEventListener('input', renderRecords);
+  const clearBtn = $('#clear-filters');
+  if (clearBtn) clearBtn.onclick = () => { $('#filter-form')?.reset(); confirmation = 'all'; renderRecords(); };
   root.querySelectorAll('[data-confirmation]').forEach(button => button.onclick = () => { confirmation = button.dataset.confirmation; renderRecords(); });
-  [$('#export-excel'), $('#schedule-excel')].forEach(button => button.onclick = exportExcel);
-  $('#export-summary').onclick = () => {
+  [$('#export-excel'), $('#schedule-excel')].filter(Boolean).forEach(button => button.onclick = exportExcel);
+  const exportSummaryBtn = $('#export-summary');
+  if (exportSummaryBtn) exportSummaryBtn.onclick = () => {
     const sections = ['.project-hero', '#kpis', '#management-summary', '#information', '#acquisitions', '#schedule', '#ownership', '#references', '#patta', '#verification', '.disclaimer'];
-    const report = ['DNAssets — Property Document Summary', `Generated: ${new Date().toISOString()}`, `Record filters: ${JSON.stringify({ ...filters(), confirmation })}`, 'KPIs represent the full project. Detailed records reflect active filters.', ...sections.map(selector => $(selector).innerText)];
+    const report = ['DNAssets — Property Document Summary', `Generated: ${new Date().toISOString()}`, `Record filters: ${JSON.stringify({ ...filters(), confirmation })}`, 'KPIs represent the full project. Detailed records reflect active filters.', ...sections.map(selector => $(selector)?.innerText || '').filter(Boolean)];
     download(report.join('\n\n'), 'DNAssets-document-summary.txt', 'text/plain;charset=utf-8'); feedback('Document summary downloaded.');
   };
-  $('#print-report').onclick = () => printReport('dashboard');
+  const printReportBtn = $('#print-report');
+  if (printReportBtn) printReportBtn.onclick = () => printReport('dashboard');
   root.querySelectorAll('[data-pdf]').forEach(button => button.onclick = () => printReport(button.dataset.pdf));
   window.addEventListener('afterprint', () => delete host.dataset.printMode, { signal: lifecycle.signal });
-  root.addEventListener('click', event => { if (!event.target.closest('.export-menu')) $('.export-menu').open = false; }, { signal: lifecycle.signal });
-  root.addEventListener('keydown', event => { if (event.key === 'Escape') $('.export-menu').open = false; }, { signal: lifecycle.signal });
+  root.addEventListener('click', event => { if (!event.target.closest('.export-menu')) { const m = $('.export-menu'); if (m) m.open = false; } }, { signal: lifecycle.signal });
+  root.addEventListener('keydown', event => { if (event.key === 'Escape') { const m = $('.export-menu'); if (m) m.open = false; } }, { signal: lifecycle.signal });
   const navLinks = [...root.querySelectorAll('.sidebar nav a')];
   function highlight() {
     let active = '#overview';
-    for (const link of navLinks) if ($(link.hash).getBoundingClientRect().top <= 110) active = link.hash;
+    for (const link of navLinks) {
+      const target = link.hash ? $(link.hash) : null;
+      if (target && target.getBoundingClientRect().top <= 110) active = link.hash;
+    }
     for (const link of navLinks) if (link.hash === active) link.setAttribute('aria-current', 'location'); else link.removeAttribute('aria-current');
   }
   let scheduled = false;

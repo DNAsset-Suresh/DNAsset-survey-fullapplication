@@ -1,16 +1,16 @@
-import './firebase.js';
-import {renderManagement,wireManagement,renderRecentActivity,reviewRows} from './management.js';
-import { api, hasSession } from './api.js';
-import { loginScreen, logout } from './auth.js';
-import { esc, icon, toast, modal, date, badge, empty, meter } from './ui.js';
-import { previewProperty, previewChecklist } from './preview.js';
-import { renderDashboard, surveyTable, locationText } from './dashboard.js';
-import { mountPropertyOverview } from './property-overview.js';
-import { propertyForm } from './surveys.js';
-import { renderChecklist, reviewDialog } from './checklist.js';
-import { uploadFiles, openFile } from './uploads.js?v=1.0.1';
-import { renderReports, exportReport, emailReport } from './reports.js';
-import { projectModal, surveyModal, renderProjectTable, renderProjectDetail, renderStatusMatrix, renderLockedProjectScreen, unlockProjectModal } from './projects.js';
+import './firebase.js?v=1.1.0';
+import {renderManagement,wireManagement,renderRecentActivity,reviewRows} from './management.js?v=1.1.0';
+import { api, hasSession } from './api.js?v=1.1.0';
+import { loginScreen, logout } from './auth.js?v=1.1.0';
+import { esc, icon, toast, modal, date, badge, empty, meter } from './ui.js?v=1.1.0';
+import { previewProperty, previewChecklist } from './preview.js?v=1.1.0';
+import { renderDashboard, surveyTable, locationText } from './dashboard.js?v=1.1.0';
+import { mountPropertyOverview } from './property-overview.js?v=1.1.0';
+import { propertyForm } from './surveys.js?v=1.1.0';
+import { renderChecklist, reviewDialog } from './checklist.js?v=1.1.0';
+import { uploadFiles, openFile } from './uploads.js?v=1.1.0';
+import { renderReports, exportReport, emailReport } from './reports.js?v=1.1.0';
+import { projectModal, surveyModal, renderProjectTable, renderProjectDetail, renderStatusMatrix, renderLockedProjectScreen, unlockProjectModal } from './projects.js?v=1.1.0';
 
 const state = {
   preview: false,
@@ -394,10 +394,12 @@ async function route(reuseData = false) {
     wireManagement(page,id,state,route);
     window.scrollTo(0, 0);
   } catch (error) {
+    console.error('[Route Error]', error);
     if (version !== renderVersion) return;
     main.removeAttribute('aria-busy');
-    main.innerHTML = empty('Unable to load this view', error.message);
-    toast(error.message, true);
+    const msg = error?.stack ? `${error.message}\n\nStack:\n${error.stack}` : (error?.message || 'Unknown error');
+    main.innerHTML = empty('Unable to load this view', msg);
+    toast(error?.message || 'Unable to load view', true);
   }
 }
 
@@ -958,9 +960,11 @@ function wire(page, id) {
   document.querySelector('[data-print]')?.addEventListener('click', () => window.print());
 
   document.querySelector('[data-expand]')?.addEventListener('click', e => {
-    const open = e.target.textContent === 'Expand all';
+    const btn = e.target.closest('[data-expand]') || e.target;
+    if (!btn) return;
+    const open = btn.textContent?.trim() === 'Expand all';
     document.querySelectorAll('.document-card').forEach(d => d.open = open);
-    e.target.textContent = open ? 'Collapse all' : 'Expand all';
+    btn.textContent = open ? 'Collapse all' : 'Expand all';
   });
 
   document.querySelectorAll('[data-collected]').forEach(input => input.onchange = protect(async () => {

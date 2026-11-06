@@ -474,38 +474,50 @@ export function unlockProjectModal(project, onUnlocked) {
 
   const form = dialog.querySelector('form');
   const errorBanner = dialog.querySelector('#unlock-error-banner');
-  form.addEventListener('submit', async e => {
-    e.preventDefault();
-    errorBanner.classList.remove('visible');
-    errorBanner.textContent = '';
-    const submitBtn = form.querySelector('[type=submit]');
-    const originalText = submitBtn.innerHTML;
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Verifying…';
-
-    try {
-      const password = form.querySelector('#unlock_password_input').value;
-      const res = await api(`/projects/${p.id}/unlock`, {
-        method: 'POST',
-        body: { password }
-      });
-      setProjectUnlockToken(p.id, res.unlock_token);
-      dialog.close();
-      toast('Project unlocked successfully!');
-      if (typeof onUnlocked === 'function') onUnlocked(res);
-    } catch (err) {
-      errorBanner.textContent = err.message || 'Incorrect project password. Please verify with Administrator.';
-      errorBanner.classList.add('visible');
-      const input = form.querySelector('#unlock_password_input');
-      if (input) {
-        input.value = '';
-        input.focus();
+  if (form) {
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      if (errorBanner) {
+        errorBanner.classList.remove('visible');
+        errorBanner.textContent = '';
       }
-    } finally {
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = originalText;
-    }
-  });
+      const submitBtn = form.querySelector('[type=submit]');
+      const originalText = submitBtn ? submitBtn.innerHTML : '';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Verifying…';
+      }
+
+      try {
+        const password = form.querySelector('#unlock_password_input')?.value;
+        const res = await api(`/projects/${p.id}/unlock`, {
+          method: 'POST',
+          body: { password }
+        });
+        setProjectUnlockToken(p.id, res.unlock_token);
+        dialog.close();
+        toast('Project unlocked successfully!');
+        if (typeof onUnlocked === 'function') onUnlocked(res);
+      } catch (err) {
+        if (errorBanner) {
+          errorBanner.textContent = err.message || 'Incorrect project password. Please verify with Administrator.';
+          errorBanner.classList.add('visible');
+        } else {
+          toast(err.message || 'Incorrect project password. Please verify with Administrator.', true);
+        }
+        const input = form.querySelector('#unlock_password_input');
+        if (input) {
+          input.value = '';
+          input.focus();
+        }
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = originalText;
+        }
+      }
+    });
+  }
 }
 
 export function renderLockedProjectScreen(project) {

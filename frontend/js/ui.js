@@ -5,7 +5,25 @@ export const date=value=>value?new Intl.DateTimeFormat('en-IN',{dateStyle:'mediu
 export const size=bytes=>bytes<1048576?`${(bytes/1024).toFixed(1)} KB`:`${(bytes/1048576).toFixed(1)} MB`;
 export const badge=status=>`<span class="badge ${({'Verified':'green','Uploaded':'blue','Under Review':'amber','Rejected':'red','Pending':'gray'})[status]||'gray'}">${esc(status)}</span>`;
 export const meter=(value,label)=>`<div class="meter" role="progressbar" aria-label="${esc(label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Number(value)}"><progress max="100" value="${Number(value)}"></progress></div>`;
-export function toast(message,error=false){const el=document.querySelector('#toast');el.textContent=message;el.className=error?'visible error':'visible';clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.className='',error?10000:6000);}
+export function toast(message,error=false){
+  const el=document.querySelector('#toast');
+  if(!el) return;
+  el.textContent=message;
+  el.className=error?'visible error':'visible';
+  clearTimeout(toast.timer);
+  toast.timer=setTimeout(()=>el.className='',error?10000:6000);
+}
 export function modal(title,body){const d=document.querySelector('#modal');d.innerHTML=`<div class="modal-head"><h2 id="modal-title">${esc(title)}</h2><button class="icon-button" data-close aria-label="Close dialog">${icon('close')}</button></div>${body}`;d.querySelector('[data-close]').onclick=()=>d.close();d.showModal();return d;}
 export const empty=(title,description)=>`<div class="empty">${icon('folder')}<h3>${esc(title)}</h3><p>${esc(description)}</p></div>`;
-export function wireForm(form,fn){form.addEventListener('submit',async e=>{e.preventDefault();const button=form.querySelector('[type=submit]');const old=button.textContent;button.disabled=true;button.textContent='Saving…';try{await fn(new FormData(form));}catch(err){toast(err.message,true);}finally{button.disabled=false;button.textContent=old;}});}
+export function wireForm(form,fn){
+  if(!form) return;
+  form.addEventListener('submit',async e=>{
+    e.preventDefault();
+    const button=form.querySelector('[type=submit]');
+    const old=button?button.textContent:'';
+    if(button){button.disabled=true;button.textContent='Saving…';}
+    try{await fn(new FormData(form));}
+    catch(err){toast(err.message,true);}
+    finally{if(button){button.disabled=false;button.textContent=old;}}
+  });
+}

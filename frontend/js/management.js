@@ -66,17 +66,18 @@ export async function confirmDeletion(scope,id,refresh) {
   dialog.querySelector('[data-cancel]').onclick=()=>dialog.close();
   dialog.querySelector('form').onsubmit=e=>{
     e.preventDefault();const phrase=new FormData(e.target).get('phrase');
-    if(phrase!==plan.phrase){dialog.querySelector('.form-error').textContent='Type the exact phrase shown above.';return;}
+    const errEl=dialog.querySelector('.form-error');
+    if(phrase!==plan.phrase){if(errEl)errEl.textContent='Type the exact phrase shown above.';return;}
     dialog.innerHTML=`<div class="modal-head"><h2 id="modal-title">Final confirmation</h2></div><p class="deletion-warning">Delete ${plan.projects} projects, ${plan.surveys} surveys and ${plan.uploads} uploaded documents?</p><p>${esc(plan.policy)}</p><p>Records changed since preview will cancel this operation. This confirmation expires after five minutes.</p><p class="form-error" role="alert"></p><div class="modal-actions"><button class="button" data-cancel>Cancel</button><button class="button danger" data-final-delete>Confirm permanent ${scope==='reset'?'reset':'deletion'}</button></div>`;
     dialog.querySelector('[data-cancel]').onclick=()=>dialog.close();
     dialog.querySelector('[data-final-delete]').onclick=async e=>{
-      const button=e.currentTarget;button.disabled=true;button.textContent='Backing up and processing…';dialog.querySelector('[data-cancel]').disabled=true;
+      const button=e.currentTarget;if(button){button.disabled=true;button.textContent='Backing up and processing…';}const cancelBtn=dialog.querySelector('[data-cancel]');if(cancelBtn)cancelBtn.disabled=true;
       try {
         const result=await api('/management/execute',{method:'POST',body:{token:plan.token,phrase,confirmed:true}});
         dialog.innerHTML=`<div class="modal-head"><h2 id="modal-title">Operation complete</h2></div><p>Application records were removed. User accounts and audit logs remain.</p>${result.backupPath?`<p>Backup location:</p><code class="record-id">${esc(result.backupPath)}</code>`:''}<p>${result.storage.removed} storage objects removed; ${result.storage.pending} pending.</p>${result.storage.pending?'<button class="button" data-retry-storage>Retry pending file removal</button>':''}<div class="modal-actions"><button class="button primary" data-close>Done</button></div>`;
         dialog.querySelector('[data-close]').onclick=()=>{dialog.close();location.hash='#database';refresh();};
         dialog.querySelector('[data-retry-storage]')?.addEventListener('click',async e=>{e.currentTarget.disabled=true;try{const retry=await api(`/management/storage/${result.operation_id}/retry`,{method:'POST'});toast(`${retry.pending} storage objects still pending.`);}catch(error){toast(error.message,true);}finally{e.target.disabled=false;}});
-      } catch(error){dialog.querySelector('.form-error').textContent=error.message;button.textContent='Preview again to retry';dialog.querySelector('[data-cancel]').disabled=false;}
+      } catch(error){const fErr=dialog.querySelector('.form-error');if(fErr)fErr.textContent=error.message;if(button){button.textContent='Preview again to retry';button.disabled=false;}const cBtn=dialog.querySelector('[data-cancel]');if(cBtn)cBtn.disabled=false;}
     };
   };
 }
