@@ -1,5 +1,5 @@
-import { esc, icon, badge, empty, modal, wireForm, toast } from './ui.js?v=1.1.1';
-import { api } from './api.js?v=1.1.1';
+import { esc, icon, badge, empty, modal, wireForm, toast } from './ui.js';
+import { api } from './api.js';
 
 export function renderProjectSubnav(activeTab = 'overview') {
   const tabs = [

@@ -24,6 +24,7 @@ async function refresh() {
   if (!refreshing) refreshing = (async () => {
     const r = await fetch(base() + '/api/auth/refresh', {
       method: 'POST',
+      signal: AbortSignal.timeout(25000),
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh_token: session.refresh_token })
     });
@@ -79,5 +80,11 @@ export async function api(path, { method = 'GET', body, headers: customHeaders, 
     throw err;
   }
   if (response.status === 204) return null;
-  return blob ? response.blob() : response.json();
+  if (blob) {
+    const file = await response.blob();
+    file.name = decodeURIComponent(response.headers.get('X-File-Name') || '');
+    return file;
+  }
+  if (!response.headers.get('content-type')?.includes('application/json')) throw new Error('The server returned a page instead of API data. Please refresh or check the deployment configuration.');
+  return response.json();
 }

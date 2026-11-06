@@ -29,6 +29,7 @@ test('Tracking, scoped deletion and reset safeguards',async t=>{
   const preview=async(scope,id=null)=>(await request(app).post('/api/management/preview').set(admin).send({scope,id}).expect(200)).body;
   const execute=async plan=>request(app).post('/api/management/execute').set(admin).send({token:plan.token,phrase:plan.phrase,confirmed:true});
   const project=await createProject('Tracking A'),other=await createProject('Unrelated B');
+  await request(app).delete(`/api/projects/${project}`).set(admin).expect(409);
   const survey=await createSurvey(project,'231'),sibling=await createSurvey(project,'232'),otherSurvey=await createSurvey(other,'999');
   for(const role of ['reviewer','user','viewer'])await db.query('insert into property_members(property_id,user_id) values($1,$2)',[survey,accounts[role].id]);
   const doc=(await checklist(survey)).documents[0].id;

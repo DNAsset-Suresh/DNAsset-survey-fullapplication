@@ -34,11 +34,12 @@ export function createApp(config=configuration(),providedClients) {
   app.use('/api',rateLimit({windowMs:60000,limit:600,standardHeaders:'draft-8',legacyHeaders:false}));
   app.use(express.json({limit:'64kb'}));
   app.use('/api',(_req,res,next)=>{res.set('Cache-Control','no-store');next();});
+  if (dbs.requestMiddleware) app.use('/api', dbs.requestMiddleware);
   app.get('/api',(_req,res)=>res.json({status:'ok',service:'DNAssets Survey API',configured:config.configured}));
   app.get('/api/config',(_req,res)=>res.json({configured:config.configured,maxFileBytes:config.maxFileBytes,isLocal:Boolean(config.isLocal),emailEnabled:Boolean(config.smtp?.enabled),adminEmail:config.smtp?.user||''}));
   app.get('/api/storage/download/:token',async(req,res,next)=>{
-    const entry=dbs.signedDownloads?.get(req.params.token) || { storagePath: decodeURIComponent(req.params.token) };
-    if(entry.expires && entry.expires < Date.now()) throw fail(404, 'Download link expired or is invalid.');
+    const entry=dbs.signedDownloads?.get(req.params.token);
+    if(!entry || !entry.expires || entry.expires < Date.now()) throw fail(404, 'Download link expired or is invalid.');
     const file=unwrap(await dbs.admin.from('uploaded_files').select('id,mime_type,original_file_name').eq('storage_path',entry.storagePath).maybeSingle());
     if(!file)throw fail(404,'File no longer exists.');
     res.attachment(entry.filename||file.original_file_name).type(file.mime_type);
@@ -77,7 +78,7 @@ export function createApp(config=configuration(),providedClients) {
     next();
   });
   const role=(...roles)=>(req,_res,next)=>next(roles.includes(req.profile.role)?undefined:fail(403,'Your role cannot perform this action.'));
-  const writer=role('admin','reviewer');
+  const writer=role('admin','reviewer','user','collector');
   const rpc=async(req,name,args)=>unwrap(await dbs.admin.rpc('survey_run',{p_actor:req.actor,p_operation:name,p_args:args,p_ip:req.ip}));
   app.get('/api/health',async(req,res)=>{unwrap(await req.db.from('document_categories').select('id').limit(1));res.json({status:'ok'});});
   app.get('/api/me',(req,res)=>res.json(req.profile));
@@ -264,24 +265,10 @@ export function createApp(config=configuration(),providedClients) {
     res.json({ id });
   });
 
-  // Delete a project — admin only (includes Founder who is an admin)
+  // Destructive project changes must use the preview/confirmation/backup workflow.
   app.delete('/api/projects/:id', role('admin'), async (req, res) => {
-    const id = uuid.parse(req.params.id);
-    const project = await projectAccess(dbs.admin, id); // bypass RLS
-    // Delete files, documents, properties, and project members belonging to this project
-    const propIds = (await allRows(() => dbs.admin.from('properties').select('id').eq('project_id', id))).map(p => p.id);
-    if (propIds.length) {
-      const docIds = (await allRows(() => dbs.admin.from('property_documents').select('id').in('property_id', propIds))).map(d => d.id);
-      if (docIds.length) {
-        await dbs.admin.from('uploaded_files').delete().in('property_document_id', docIds);
-        await dbs.admin.from('property_documents').delete().in('id', docIds);
-      }
-      await dbs.admin.from('properties').delete().in('id', propIds);
-    }
-    await dbs.admin.from('project_members').delete().eq('project_id', id);
-    // Delete the project record
-    await dbs.admin.from('projects').delete().eq('id', id);
-    res.status(204).end();
+    uuid.parse(req.params.id);
+    throw fail(409, 'Use the project deletion preview and confirmation workflow.');
   });
 
   app.get('/api/projects/:id/survey-numbers', async (req, res) => {
@@ -737,6 +724,12 @@ export function createApp(config=configuration(),providedClients) {
       processor.enqueue(file.id);
       res.status(201).json({...file,processing_status:'Uploaded'});
     });
+  app.get('/api/files/:id/content',async(req,res)=>{
+    const f=await fileAccess(req.db,uuid.parse(req.params.id));
+    const result=await dbs.admin.storage.from(config.bucket).download(f.storage_path);
+    if(result.error || !result.data) throw fail(502,'Could not read the stored file. Please try again.');
+    res.set('X-File-Name',encodeURIComponent(f.original_file_name)).attachment(f.original_file_name).type(f.mime_type).send(Buffer.from(await result.data.arrayBuffer()));
+  });
   app.get('/api/files/:id/url',async(req,res)=>{
     const f=await fileAccess(req.db,uuid.parse(req.params.id));
     const result=await dbs.admin.storage.from(config.bucket).createSignedUrl(f.storage_path,60,req.query.download==='1'?{download:f.original_file_name}:{});

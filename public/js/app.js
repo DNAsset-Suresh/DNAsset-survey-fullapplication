@@ -1,16 +1,17 @@
-import './firebase.js?v=1.1.1';
-import {renderManagement,wireManagement,renderRecentActivity,reviewRows} from './management.js?v=1.1.1';
-import { api, hasSession } from './api.js?v=1.1.1';
-import { loginScreen, logout } from './auth.js?v=1.1.1';
-import { esc, icon, toast, modal, date, badge, empty, meter } from './ui.js?v=1.1.1';
-import { previewProperty, previewChecklist } from './preview.js?v=1.1.1';
-import { renderDashboard, surveyTable, locationText } from './dashboard.js?v=1.1.1';
-import { mountPropertyOverview } from './property-overview.js?v=1.1.1';
-import { propertyForm } from './surveys.js?v=1.1.1';
-import { renderChecklist, reviewDialog } from './checklist.js?v=1.1.1';
-import { uploadFiles, openFile } from './uploads.js?v=1.1.1';
-import { renderReports, exportReport, emailReport } from './reports.js?v=1.1.1';
-import { projectModal, surveyModal, renderProjectTable, renderProjectDetail, wireProjectDetail, renderStatusMatrix, renderLockedProjectScreen, unlockProjectModal } from './projects.js?v=1.1.1';
+// Analytics is optional and must never block sign-in or navigation.
+import('./firebase.js').catch(() => {});
+import {renderManagement,wireManagement,renderRecentActivity,reviewRows,confirmDeletion} from './management.js';
+import { api, hasSession } from './api.js';
+import { loginScreen, logout } from './auth.js';
+import { esc, icon, toast, modal, date, badge, empty, meter } from './ui.js';
+import { previewProperty, previewChecklist } from './preview.js';
+import { renderDashboard, surveyTable, locationText } from './dashboard.js';
+import { mountPropertyOverview } from './property-overview.js';
+import { propertyForm } from './surveys.js';
+import { renderChecklist, reviewDialog } from './checklist.js';
+import { uploadFiles, openFile } from './uploads.js';
+import { renderReports, exportReport, emailReport } from './reports.js';
+import { projectModal, surveyModal, renderProjectTable, renderProjectDetail, wireProjectDetail, renderStatusMatrix, renderLockedProjectScreen, unlockProjectModal } from './projects.js';
 
 const state = {
   preview: false,
@@ -857,24 +858,12 @@ function wire(page, id) {
     editProjectBtn.onclick = () => projectModal(state.currentProject, route, state.profile?.role);
   }
 
-  // Delete Project — admin only, with confirmation
+  // Every project deletion uses the same protected workflow.
   document.querySelectorAll('[data-delete-project]').forEach(btn => {
-    btn.onclick = async () => {
-      const targetId = btn.dataset.deleteProject;
-      const proj = state.projects.find(p => p.id === targetId) || state.currentProject || { project_name: 'this project' };
-      const confirmed = window.confirm(`⚠️ DELETE PROJECT\n\nAre you sure you want to permanently delete "${proj.project_name}"?\n\nThis will also delete all survey numbers, documents, uploads, and checklists inside it.\n\nThis action CANNOT be undone.`);
-      if (!confirmed) return;
-      try {
-        btn.disabled = true;
-        await api(`/projects/${targetId}`, { method: 'DELETE' });
-        state.projects = state.projects.filter(p => p.id !== targetId);
-        toast(`Project "${proj.project_name}" deleted.`);
-        location.hash = '#projects';
-      } catch (err) {
-        toast(err.message || 'Failed to delete project.', true);
-        btn.disabled = false;
-      }
-    };
+    btn.onclick = protect(() => confirmDeletion('project', btn.dataset.deleteProject, async () => {
+      if (page === 'project') location.hash = '#projects';
+      else await route();
+    }));
   });
 
   // Unlock Project Buttons
@@ -932,21 +921,7 @@ function wire(page, id) {
         };
       });
       container.querySelectorAll('[data-delete-project]').forEach(btn => {
-        btn.onclick = async () => {
-          const targetId = btn.dataset.deleteProject;
-          const proj = state.projects.find(p => p.id === targetId) || { project_name: 'this project' };
-          if (!window.confirm(`⚠️ DELETE PROJECT\n\nPermanently delete "${proj.project_name}" and all its survey numbers, documents and uploads?\n\nThis CANNOT be undone.`)) return;
-          try {
-            btn.disabled = true;
-            await api(`/projects/${targetId}`, { method: 'DELETE' });
-            state.projects = state.projects.filter(p => p.id !== targetId);
-            toast(`Project "${proj.project_name}" deleted.`);
-            route();
-          } catch (err) {
-            toast(err.message || 'Failed to delete project.', true);
-            btn.disabled = false;
-          }
-        };
+        btn.onclick = protect(() => confirmDeletion('project', btn.dataset.deleteProject, route));
       });
     }
   });

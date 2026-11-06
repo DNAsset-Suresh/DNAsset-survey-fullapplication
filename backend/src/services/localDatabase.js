@@ -537,17 +537,7 @@ export async function initLocalClients(config) {
           if (isRemote) { user = (await db.query('select id,email from auth.users where lower(email)=$1 and encrypted_password=extensions.crypt($2,encrypted_password)', [cleanEmail, password])).rows[0]; }
           else {
             user = (await db.query('select id,email,password from auth.users where lower(email)=$1', [cleanEmail])).rows[0];
-            if (!user && cleanEmail === 'admin@dnassets.com') {
-              user = (await db.query("select id,email,password from auth.users where lower(email)='dna.callus@gmail.com'")).rows[0];
-            }
-            if (!user || !await checkPassword(password, user.password)) {
-              // check if alternative password matches
-              if (user && (password === 'admin123' || password === 'dna.suresh123' || password === 'reviewer123' || password === 'naresh123')) {
-                // allow fallback match for primary accounts
-              } else {
-                user = null;
-              }
-            }
+            if (!user || !await checkPassword(password, user.password)) user = null;
             else if (!user.password.startsWith('scrypt:')) { await db.query('update auth.users set password=$1 where id=$2', [await hashPassword(password), user.id]); await flushDb(); }
           }
           return user ? { data: { session: sessions.issue(user) }, error: null } : { data: { session: null }, error: { message: 'Email or password is incorrect.' } };

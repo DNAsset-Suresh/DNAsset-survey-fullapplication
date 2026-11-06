@@ -4,7 +4,7 @@ import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, dele
 import { getDatabase, ref as rtdbRef, get as rtdbGet, set as rtdbSet, update as rtdbUpdate, remove as rtdbRemove } from 'firebase/database';
 import { getStorage, ref as storageRef, uploadBytes, getBytes, deleteObject, getDownloadURL } from 'firebase/storage';
 import { randomUUID } from 'node:crypto';
-import { hashPassword, checkPassword, sessionStore } from './localSecurity.js';
+import { requestFirebase } from './firebaseRequest.js';
 import { fail } from '../validators.js';
 
 export const firebaseConfig = {
@@ -28,7 +28,7 @@ const firebaseStorage = getStorage(firebaseApp);
 export { firebaseApp, firebaseAuth, firestoreDb, rtdb, firebaseStorage };
 
 // In-memory sessions store for JWT-compatible API auth
-const sessions = sessionStore();
+
 
 /**
  * Creates Firebase Storage wrapper matching existing Supabase storage API:
@@ -37,13 +37,13 @@ const sessions = sessionStore();
  *   storage.from(bucket).remove([paths])
  *   storage.from(bucket).createSignedUrl(path, expiresIn, options)
  */
-export function createFirebaseStorage(customStorage = firebaseStorage) {
+export function createFirebaseStorage(customStorage) {
   return {
     from(bucketName) {
       return {
         async upload(storagePath, buffer, options = {}) {
           try {
-            const fileRef = storageRef(customStorage, storagePath);
+            const fileRef = storageRef(customStorage || requestFirebase().storage, storagePath);
             const metadata = { contentType: options.contentType || 'application/octet-stream' };
             await uploadBytes(fileRef, buffer, metadata);
             return { error: null };
@@ -51,7 +51,7 @@ export function createFirebaseStorage(customStorage = firebaseStorage) {
             console.warn('[Firebase Storage] Primary upload failed, saving to Firestore fallback:', err.message);
             try {
               const safeDocId = storagePath.replace(/\//g, '__');
-              await setDoc(doc(firestoreDb, 'storage_objects', safeDocId), {
+              await setDoc(doc(requestFirebase().firestore, 'storage_objects', safeDocId), {
                 path: storagePath,
                 data: Buffer.from(buffer).toString('base64'),
                 contentType: options.contentType || 'application/octet-stream',
@@ -67,13 +67,13 @@ export function createFirebaseStorage(customStorage = firebaseStorage) {
         },
         async download(storagePath) {
           try {
-            const fileRef = storageRef(customStorage, storagePath);
+            const fileRef = storageRef(customStorage || requestFirebase().storage, storagePath);
             const bytes = await getBytes(fileRef);
             return { data: new Blob([bytes]), error: null };
           } catch (err) {
             try {
               const safeDocId = storagePath.replace(/\//g, '__');
-              const docSnap = await getDoc(doc(firestoreDb, 'storage_objects', safeDocId));
+              const docSnap = await getDoc(doc(requestFirebase().firestore, 'storage_objects', safeDocId));
               if (docSnap.exists()) {
                 const item = docSnap.data();
                 const buffer = Buffer.from(item.data, 'base64');
@@ -88,34 +88,28 @@ export function createFirebaseStorage(customStorage = firebaseStorage) {
         async remove(paths) {
           for (const sp of paths) {
             try {
-              const fileRef = storageRef(customStorage, sp);
+              const fileRef = storageRef(customStorage || requestFirebase().storage, sp);
               await deleteObject(fileRef).catch(() => {});
             } catch {}
             try {
               const safeDocId = sp.replace(/\//g, '__');
-              await deleteDoc(doc(firestoreDb, 'storage_objects', safeDocId));
+              await deleteDoc(doc(requestFirebase().firestore, 'storage_objects', safeDocId));
             } catch {}
           }
           return { error: null };
         },
         async createSignedUrl(storagePath, expiresIn = 60, options = {}) {
           try {
-            const fileRef = storageRef(customStorage, storagePath);
+            const fileRef = storageRef(customStorage || requestFirebase().storage, storagePath);
             const downloadUrl = await getDownloadURL(fileRef);
             return {
               data: {
-                signedUrl: downloadUrl + (options.download ? `?download=${encodeURIComponent(options.download)}` : '')
+                signedUrl: downloadUrl + (options.download ? `&download=${encodeURIComponent(options.download)}` : '')
               },
               error: null
             };
           } catch (err) {
-            console.warn('[Firebase Storage] createSignedUrl fallback:', err.message);
-            return {
-              data: {
-                signedUrl: `/api/storage/download/${encodeURIComponent(storagePath)}`
-              },
-              error: null
-            };
+            return { data: null, error: err };
           }
         }
       };

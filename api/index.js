@@ -9,17 +9,15 @@ if (process.env.USE_FIREBASE === undefined) {
   process.env.USE_FIREBASE = 'true';
 }
 
-let appInstance = null;
+let appPromise = null;
 
 async function getApp() {
-  if (appInstance) return appInstance;
-  const config = configuration();
-  let clients = null;
-  if (process.env.USE_FIREBASE !== 'false' || config.useFirebase) {
-    clients = await initFirebaseClients(config);
-  }
-  appInstance = createApp(config, clients);
-  return appInstance;
+  if (!appPromise) appPromise = (async () => {
+    const config = configuration();
+    const clients = config.useFirebase ? await initFirebaseClients(config) : null;
+    return createApp(config, clients);
+  })().catch(error => { appPromise = null; throw error; });
+  return appPromise;
 }
 
 export default async function handler(req, res) {

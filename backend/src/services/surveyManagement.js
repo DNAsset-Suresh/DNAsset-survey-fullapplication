@@ -103,8 +103,8 @@ export function installSurveyManagement({app,dbs,config,role,verifyProjectAccess
       await writeFile(path.join(folder,'manifest.json'),JSON.stringify({operation,scope:plan.scope,createdAt:new Date().toISOString(),actor:req.actor,files:records,tables:Object.fromEntries(Object.entries(data).map(([k,v])=>[k,(v||[]).length]))},null,2),{flag:'wx'});
       return folder;
     } catch(err) {
-      console.warn('Backup non-fatal warning:', err.message);
-      return null;
+      console.warn('Survey backup failed:', err.message);
+      throw fail(503,'Backup failed. Nothing was deleted. Restore backup storage access and try again.');
     }
   }
   async function cleanup(operation) {

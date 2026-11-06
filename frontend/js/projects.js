@@ -10,7 +10,7 @@ import {
   acquisitionDeedModal,
   scheduleDetailModal,
   exportScheduleToExcel
-} from './project-schedule.js?v=1.1.1';
+} from './project-schedule.js';
 
 export const locationText = p => [p.village, p.taluk, p.district].filter(Boolean).join(', ') || 'Location pending';
 

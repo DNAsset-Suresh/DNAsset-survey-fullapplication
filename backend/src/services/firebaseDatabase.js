@@ -1,4 +1,8 @@
-import { firebaseApp, firebaseAuth, firestoreDb, firebaseStorage, createFirebaseStorage } from './firebase.js';
+import { createFirebaseStorage } from './firebase.js';
+import { requestFirebase, firebaseRequestMiddleware, firebaseAuthRequest, firebaseSession, normalizeLoginEmail } from './firebaseRequest.js';
+import { initializeServerApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 import {
   collection,
   doc,
@@ -22,10 +26,10 @@ import {
   updateProfile
 } from 'firebase/auth';
 import { randomUUID } from 'node:crypto';
-import { sessionStore } from './localSecurity.js';
+
 import { fail } from '../validators.js';
 
-const sessions = sessionStore();
+
 const signedDownloads = new Map();
 
 export const DEFAULT_CATEGORIES = [
@@ -488,7 +492,7 @@ async function computeProjectProgress(firestore, filters, orders = [], offsetCou
  * Initializes and returns Firebase database & auth client wrappers matching Supabase API
  */
 export async function initFirebaseClients(config) {
-  const firebaseStorageWrapper = createFirebaseStorage(firebaseStorage);
+  const firebaseStorageWrapper = createFirebaseStorage();
 
   async function rpc(name, args) {
     try {
@@ -509,16 +513,16 @@ export async function initFirebaseClients(config) {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
-        await setDoc(doc(firestoreDb, 'projects', id), projectData, { merge: true });
+        await setDoc(doc(requestFirebase().firestore, 'projects', id), projectData, { merge: true });
         // Add creator and reviewers to project_members
-        await setDoc(doc(firestoreDb, 'project_members', `${id}_${p_actor}`), {
+        await setDoc(doc(requestFirebase().firestore, 'project_members', `${id}_${p_actor}`), {
           project_id: id,
           user_id: p_actor
         }, { merge: true });
 
-        const revSnap = await getDocs(query(collection(firestoreDb, 'profiles'), where('role', 'in', ['admin', 'reviewer'])));
+        const revSnap = await getDocs(query(collection(requestFirebase().firestore, 'profiles'), where('role', 'in', ['admin', 'reviewer'])));
         for (const rd of revSnap.docs) {
-          await setDoc(doc(firestoreDb, 'project_members', `${id}_${rd.id}`), {
+          await setDoc(doc(requestFirebase().firestore, 'project_members', `${id}_${rd.id}`), {
             project_id: id,
             user_id: rd.id
           }, { merge: true });
@@ -536,17 +540,17 @@ export async function initFirebaseClients(config) {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
-        await setDoc(doc(firestoreDb, 'properties', id), propertyData, { merge: true });
+        await setDoc(doc(requestFirebase().firestore, 'properties', id), propertyData, { merge: true });
 
         // If new property, seed the 7 required checklist categories
         if (!p_id) {
-          const catsSnap = await getDocs(collection(firestoreDb, 'document_categories'));
+          const catsSnap = await getDocs(collection(requestFirebase().firestore, 'document_categories'));
           let cats = catsSnap.docs.map(cd => ({ id: cd.id, ...cd.data() }));
           if (!cats.length) cats = DEFAULT_CATEGORIES;
-          const batch = writeBatch(firestoreDb);
+          const batch = writeBatch(requestFirebase().firestore);
           for (const cd of cats) {
             const docId = randomUUID();
-            const docRef = doc(firestoreDb, 'property_documents', docId);
+            const docRef = doc(requestFirebase().firestore, 'property_documents', docId);
             batch.set(docRef, {
               id: docId,
               property_id: id,
@@ -569,7 +573,7 @@ export async function initFirebaseClients(config) {
 
       if (opName === 'update_document') {
         const { p_actor, p_document, p_data, p_review = false } = opArgs;
-        const docRef = doc(firestoreDb, 'property_documents', p_document);
+        const docRef = doc(requestFirebase().firestore, 'property_documents', p_document);
         const updatePayload = {
           ...p_data,
           updated_at: new Date().toISOString()
@@ -586,7 +590,7 @@ export async function initFirebaseClients(config) {
         const filters = opArgs?.p_filters || {};
         const limitCount = Math.min(Number(filters.limit) || 25, 1000);
         const offsetCount = Number(filters.offset) || 0;
-        const snap = await getDocs(collection(firestoreDb, 'upload_history'));
+        const snap = await getDocs(collection(requestFirebase().firestore, 'upload_history'));
         let history = snap.docs.map(d => ({ ...d.data(), id: d.id }));
         history.sort((a, b) => (b.upload_timestamp || '').localeCompare(a.upload_timestamp || ''));
         const total = history.length;
@@ -601,13 +605,13 @@ export async function initFirebaseClients(config) {
         const offsetCount = Number(filters.offset) || 0;
 
         if (kind === 'audit') {
-          const snap = await getDocs(collection(firestoreDb, 'audit_logs'));
+          const snap = await getDocs(collection(requestFirebase().firestore, 'audit_logs'));
           let rows = snap.docs.map(d => ({ ...d.data(), id: d.id }));
           rows.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
           rows = rows.slice(offsetCount, offsetCount + limitCount);
           return { data: { rows }, error: null };
         } else {
-          const snap = await getDocs(collection(firestoreDb, 'document_reviews'));
+          const snap = await getDocs(collection(requestFirebase().firestore, 'document_reviews'));
           let rows = snap.docs.map(d => ({ ...d.data(), id: d.id }));
           rows.sort((a, b) => (b.reviewed_at || '').localeCompare(a.reviewed_at || ''));
           rows = rows.slice(offsetCount, offsetCount + limitCount);
@@ -619,12 +623,12 @@ export async function initFirebaseClients(config) {
         const p_scope = opArgs?.p_scope || 'project';
         const p_id = opArgs?.p_id || null;
 
-        const projectsSnap = await getDocs(collection(firestoreDb, 'projects'));
-        const propsSnap = await getDocs(collection(firestoreDb, 'properties'));
-        const docsSnap = await getDocs(collection(firestoreDb, 'property_documents'));
-        const filesSnap = await getDocs(collection(firestoreDb, 'uploaded_files'));
-        const reviewsSnap = await getDocs(collection(firestoreDb, 'document_reviews'));
-        const historySnap = await getDocs(collection(firestoreDb, 'upload_history'));
+        const projectsSnap = await getDocs(collection(requestFirebase().firestore, 'projects'));
+        const propsSnap = await getDocs(collection(requestFirebase().firestore, 'properties'));
+        const docsSnap = await getDocs(collection(requestFirebase().firestore, 'property_documents'));
+        const filesSnap = await getDocs(collection(requestFirebase().firestore, 'uploaded_files'));
+        const reviewsSnap = await getDocs(collection(requestFirebase().firestore, 'document_reviews'));
+        const historySnap = await getDocs(collection(requestFirebase().firestore, 'upload_history'));
 
         const projects = projectsSnap.docs.map(d => ({ ...d.data(), id: d.id }));
         const props = propsSnap.docs.map(d => ({ ...d.data(), id: d.id }));
@@ -688,10 +692,10 @@ export async function initFirebaseClients(config) {
 
       if (opName === 'survey_destroy') {
         const { p_scope, p_id } = opArgs;
-        const projectsSnap = await getDocs(collection(firestoreDb, 'projects'));
-        const propsSnap = await getDocs(collection(firestoreDb, 'properties'));
-        const docsSnap = await getDocs(collection(firestoreDb, 'property_documents'));
-        const filesSnap = await getDocs(collection(firestoreDb, 'uploaded_files'));
+        const projectsSnap = await getDocs(collection(requestFirebase().firestore, 'projects'));
+        const propsSnap = await getDocs(collection(requestFirebase().firestore, 'properties'));
+        const docsSnap = await getDocs(collection(requestFirebase().firestore, 'property_documents'));
+        const filesSnap = await getDocs(collection(requestFirebase().firestore, 'uploaded_files'));
 
         const projects = projectsSnap.docs.map(d => ({ ...d.data(), id: d.id }));
         const props = propsSnap.docs.map(d => ({ ...d.data(), id: d.id }));
@@ -717,23 +721,23 @@ export async function initFirebaseClients(config) {
         const matchingFiles = files.filter(f => didsSet.has(f.property_document_id));
 
         for (const f of matchingFiles) {
-          await deleteDoc(doc(firestoreDb, 'uploaded_files', f.id));
+          await deleteDoc(doc(requestFirebase().firestore, 'uploaded_files', f.id));
         }
         for (const d of matchingDocs) {
-          await deleteDoc(doc(firestoreDb, 'property_documents', d.id));
+          await deleteDoc(doc(requestFirebase().firestore, 'property_documents', d.id));
         }
         for (const pid of pids) {
-          await deleteDoc(doc(firestoreDb, 'properties', pid));
+          await deleteDoc(doc(requestFirebase().firestore, 'properties', pid));
         }
         for (const prid of prids) {
-          await deleteDoc(doc(firestoreDb, 'projects', prid));
+          await deleteDoc(doc(requestFirebase().firestore, 'projects', prid));
         }
 
         if (p_scope === 'reset') {
-          const revSnap = await getDocs(collection(firestoreDb, 'document_reviews'));
-          for (const d of revSnap.docs) await deleteDoc(doc(firestoreDb, 'document_reviews', d.id));
-          const histSnap = await getDocs(collection(firestoreDb, 'upload_history'));
-          for (const d of histSnap.docs) await deleteDoc(doc(firestoreDb, 'upload_history', d.id));
+          const revSnap = await getDocs(collection(requestFirebase().firestore, 'document_reviews'));
+          for (const d of revSnap.docs) await deleteDoc(doc(requestFirebase().firestore, 'document_reviews', d.id));
+          const histSnap = await getDocs(collection(requestFirebase().firestore, 'upload_history'));
+          for (const d of histSnap.docs) await deleteDoc(doc(requestFirebase().firestore, 'upload_history', d.id));
         }
 
         return { data: { success: true }, error: null };
@@ -743,7 +747,7 @@ export async function initFirebaseClients(config) {
         const collections = ['projects', 'properties', 'property_documents', 'uploaded_files', 'upload_history', 'document_reviews', 'storage_cleanup', 'property_members', 'project_members', 'document_categories'];
         const backupData = {};
         for (const col of collections) {
-          const snap = await getDocs(collection(firestoreDb, col));
+          const snap = await getDocs(collection(requestFirebase().firestore, col));
           backupData[col] = snap.docs.map(d => ({ ...d.data(), id: d.id }));
         }
         return { data: backupData, error: null };
@@ -751,7 +755,7 @@ export async function initFirebaseClients(config) {
 
       if (opName === 'survey_archive') {
         const { p_id, p_archived } = opArgs;
-        const projectRef = doc(firestoreDb, 'projects', p_id);
+        const projectRef = doc(requestFirebase().firestore, 'projects', p_id);
         await updateDoc(projectRef, {
           archived_at: p_archived ? new Date().toISOString() : null,
           updated_at: new Date().toISOString()
@@ -761,7 +765,7 @@ export async function initFirebaseClients(config) {
 
       if (opName === 'manage_member') {
         const { p_property, p_user, p_remove } = opArgs;
-        const memberRef = doc(firestoreDb, 'property_members', `${p_property}_${p_user}`);
+        const memberRef = doc(requestFirebase().firestore, 'property_members', `${p_property}_${p_user}`);
         if (p_remove) {
           await deleteDoc(memberRef);
         } else {
@@ -789,13 +793,13 @@ export async function initFirebaseClients(config) {
           uploaded_at: now,
           created_at: now
         };
-        await setDoc(doc(firestoreDb, 'uploaded_files', fileId), fileRecord);
+        await setDoc(doc(requestFirebase().firestore, 'uploaded_files', fileId), fileRecord);
 
         if (p_replace) {
-          await deleteDoc(doc(firestoreDb, 'uploaded_files', p_replace));
+          await deleteDoc(doc(requestFirebase().firestore, 'uploaded_files', p_replace));
         }
 
-        const docRef = doc(firestoreDb, 'property_documents', p_document);
+        const docRef = doc(requestFirebase().firestore, 'property_documents', p_document);
         await setDoc(docRef, {
           is_collected: true,
           verification_status: 'Uploaded',
@@ -807,7 +811,7 @@ export async function initFirebaseClients(config) {
 
         // Audit log
         const auditId = randomUUID();
-        await setDoc(doc(firestoreDb, 'audit_logs', auditId), {
+        await setDoc(doc(requestFirebase().firestore, 'audit_logs', auditId), {
           id: auditId,
           actor_id: p_actor,
           action: p_replace ? 'file.replaced' : 'file.uploaded',
@@ -820,15 +824,15 @@ export async function initFirebaseClients(config) {
 
       if (opName === 'remove_file') {
         const { p_actor, p_file } = opArgs;
-        const fileRef = doc(firestoreDb, 'uploaded_files', p_file);
+        const fileRef = doc(requestFirebase().firestore, 'uploaded_files', p_file);
         const fileSnap = await getDoc(fileRef);
         if (fileSnap.exists()) {
           const fileData = fileSnap.data();
           await deleteDoc(fileRef);
           if (fileData.property_document_id) {
-            const otherFiles = await getDocs(query(collection(firestoreDb, 'uploaded_files'), where('property_document_id', '==', fileData.property_document_id)));
+            const otherFiles = await getDocs(query(collection(requestFirebase().firestore, 'uploaded_files'), where('property_document_id', '==', fileData.property_document_id)));
             if (otherFiles.empty) {
-              await updateDoc(doc(firestoreDb, 'property_documents', fileData.property_document_id), {
+              await updateDoc(doc(requestFirebase().firestore, 'property_documents', fileData.property_document_id), {
                 is_collected: false,
                 verification_status: 'Pending',
                 updated_at: new Date().toISOString()
@@ -850,15 +854,26 @@ export async function initFirebaseClients(config) {
     admin: {
       auth: {
         async getUser(token) {
-          const payload = sessions.verify(token);
-          if (!payload) return { data: { user: null }, error: { message: 'Invalid session' } };
-          const profDoc = await getDoc(doc(firestoreDb, 'profiles', payload.sub));
-          const user = profDoc.exists() ? { id: payload.sub, email: profDoc.data().email } : null;
-          return { data: { user }, error: null };
+          try {
+            const context = requestFirebase();
+            if (!token || context.token !== token) return { data: { user: null }, error: { message: 'Invalid session' } };
+            await context.auth.authStateReady();
+            const firebaseUser = context.auth.currentUser;
+            if (!firebaseUser) return { data: { user: null }, error: { message: 'Session expired' } };
+            const mapping = await getDoc(doc(context.firestore, 'users', firebaseUser.uid));
+            const profileId = mapping.exists() ? mapping.data().id || firebaseUser.uid : firebaseUser.uid;
+            const profile = await getDoc(doc(context.firestore, 'profiles', profileId));
+            if (!profile.exists()) throw fail(403, 'Your sign-in is valid, but your workspace profile is missing. Contact an administrator.');
+            context.actor = profileId;
+            return { data: { user: { id: profileId, email: firebaseUser.email } }, error: null };
+          } catch (error) {
+            if (error.status === 403) throw error;
+            throw fail(503, 'Your account could not be loaded. Check Firebase permissions and try again.');
+          }
         },
         admin: {
           async signOut(token) {
-            sessions.revoke(token);
+            // Firebase ID tokens expire after one hour; the browser clears its session.
             return { error: null };
           },
           async updateUserById(id, { password, email, user_metadata = {} } = {}) {
@@ -867,10 +882,12 @@ export async function initFirebaseClients(config) {
               if (email) updates.email = email.toLowerCase().trim();
               if (user_metadata.full_name !== undefined) updates.full_name = user_metadata.full_name;
 
-              await updateDoc(doc(firestoreDb, 'profiles', id), updates).catch(() => {});
+              const context = requestFirebase();
               if (password) {
-                sessions.revokeUser(id);
+                if (id !== context.actor) throw fail(501, 'Reset this account through Firebase Authentication. An administrator credential is required for server-side resets.');
+                await firebaseAuthRequest(context.config, 'update', { idToken: context.token, password, returnSecureToken: false });
               }
+              await updateDoc(doc(context.firestore, 'profiles', id), updates);
               return { data: { user: { id } }, error: null };
             } catch (err) {
               return { data: null, error: { message: err.message } };
@@ -878,7 +895,7 @@ export async function initFirebaseClients(config) {
           },
           async listUsers() {
             try {
-              const snap = await getDocs(collection(firestoreDb, 'profiles'));
+              const snap = await getDocs(collection(requestFirebase().firestore, 'profiles'));
               const users = snap.docs.map(d => d.data());
               return { data: { users }, error: null };
             } catch (err) {
@@ -889,56 +906,35 @@ export async function initFirebaseClients(config) {
       },
       rpc,
       storage: firebaseStorageWrapper,
-      from: table => createFirestoreQuery(firestoreDb, table, null)
+      from: table => createFirestoreQuery(requestFirebase().firestore, table, null)
     },
     anonymous: () => ({
       auth: {
         async signInWithPassword({ email, password }) {
-          let cleanEmail = (email || '').trim().toLowerCase();
-          if (cleanEmail === 'reviewer' || cleanEmail === 'naresh') cleanEmail = 'reviewer@dnassets.com';
-          else if (cleanEmail === 'admin' || cleanEmail === 'administrator') cleanEmail = 'admin@dnassets.com';
-          else if (cleanEmail === 'dna' || cleanEmail === 'suresh' || cleanEmail === 'callus') cleanEmail = 'dna.callus@gmail.com';
-          else if (cleanEmail === 'user') cleanEmail = 'user@dnassets.com';
-          else if (cleanEmail === 'founder') cleanEmail = 'founder@dnassets.com';
-          else if (cleanEmail === 'viewer') cleanEmail = 'viewer@dnassets.com';
-
-          try {
-            let cred;
-            try {
-              cred = await signInWithEmailAndPassword(firebaseAuth, cleanEmail, password);
-            } catch (err) {
-              // Try alternate known passwords for configured accounts
-              if (cleanEmail === 'reviewer@dnassets.com' && (password === 'reviewer123' || password === 'reviewer')) {
-                cred = await signInWithEmailAndPassword(firebaseAuth, cleanEmail, 'naresh123');
-              } else if (cleanEmail === 'admin@dnassets.com' && (password === 'dna.suresh123' || password === 'admin')) {
-                cred = await signInWithEmailAndPassword(firebaseAuth, cleanEmail, 'admin123');
-              } else if (cleanEmail === 'dna.callus@gmail.com' && (password === 'admin123' || password === 'dna.suresh123')) {
-                cred = await signInWithEmailAndPassword(firebaseAuth, cleanEmail, 'dna.suresh123');
-              } else if (cleanEmail === 'dna.space.sm@gmail.com' && (password === 'admin123' || password === 'dna.suresh123')) {
-                cred = await signInWithEmailAndPassword(firebaseAuth, 'dna.callus@gmail.com', 'dna.suresh123');
-                cleanEmail = 'dna.callus@gmail.com';
-              } else {
-                throw err;
-              }
-            }
-
-            const userSnap = await getDoc(doc(firestoreDb, 'users', cred.user.uid));
-            const profile = userSnap.data() || { id: cred.user.uid, email: cleanEmail };
-            const session = sessions.issue({ id: profile.id, email: cleanEmail });
-            return { data: { session }, error: null };
-          } catch (err) {
-            return { data: { session: null }, error: { message: 'Email or password is incorrect.' } };
-          }
+          const result = await firebaseAuthRequest(config.firebase, 'signInWithPassword', { email: normalizeLoginEmail(email), password, returnSecureToken: true });
+          const session = firebaseSession(result);
+          // Check access before returning a session, so an incomplete profile is not
+          // mistaken for a bad password or an unexplained return to the login screen.
+          const signedApp = initializeServerApp(config.firebase, { authIdToken: session.access_token, releaseOnDeref: result });
+          const auth = getAuth(signedApp); await auth.authStateReady();
+          if (!auth.currentUser) throw fail(401, 'The sign-in session could not be verified. Please try again.');
+          const db = getFirestore(signedApp);
+          const mapping = await getDoc(doc(db, 'users', auth.currentUser.uid));
+          const profileId = mapping.exists() ? mapping.data().id || auth.currentUser.uid : auth.currentUser.uid;
+          const profile = await getDoc(doc(db, 'profiles', profileId));
+          if (!profile.exists()) throw fail(403, 'Your workspace profile is missing. Contact an administrator.');
+          return { data: { session }, error: null };
         },
         async refreshSession({ refresh_token }) {
-          const session = sessions.refresh(refresh_token);
-          return { data: { session }, error: session ? null : { message: 'Session expired' } };
+          const result = await firebaseAuthRequest(config.firebase, 'refresh', { grant_type: 'refresh_token', refresh_token });
+          return { data: { session: firebaseSession(result) }, error: null };
         }
       }
     }),
     user: token => ({
-      from: table => createFirestoreQuery(firestoreDb, table, sessions.verify(token)?.sub)
+      from: table => createFirestoreQuery(requestFirebase().firestore, table, requestFirebase().actor)
     }),
+    requestMiddleware: firebaseRequestMiddleware(config.firebase),
     flush: async () => {},
     signedDownloads
   };

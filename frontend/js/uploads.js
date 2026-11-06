@@ -92,11 +92,15 @@ export async function openFile(id, download = false) {
   const win = download ? null : window.open('about:blank', '_blank');
   if (win) win.opener = null;
   try {
-    const { url } = await api(`/files/${id}/url${download ? '?download=1' : ''}`);
+    // Authenticated reads work across serverless workers and with fallback storage.
+    const file = await api(`/files/${id}/content`, { blob: true });
+    const url = URL.createObjectURL(file);
+    setTimeout(() => URL.revokeObjectURL(url), 120000);
     if (win) win.location.href = url;
     else {
       const a = document.createElement('a');
       a.href = url;
+      if (download) a.download = file.name || 'document';
       a.rel = 'noopener';
       a.target = '_blank';
       a.click();

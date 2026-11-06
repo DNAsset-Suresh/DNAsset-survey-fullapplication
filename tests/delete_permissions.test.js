@@ -34,6 +34,13 @@ test('Delete permissions: roles, ownership, UI, and database enforcement', async
     await app.locals.drainUploads();return result.body.id;
   };
   const userFile=await upload('user'), reviewerFile=await upload('reviewer');
+  await t.test('File content requires authentication and returns the original bytes',async()=>{
+    await request(app).get(`/api/files/${userFile}/content`).expect(401);
+    const content=await request(app).get(`/api/files/${userFile}/content`).set(accounts.user.headers).expect(200);
+    assert.equal(content.text,'Survey Number\n216\n');
+    assert.equal(decodeURIComponent(content.headers['x-file-name']),'user.csv');
+    await request(app).get('/api/storage/download/untrusted-path').expect(404);
+  });
   const data=(await request(app).get(`/api/properties/${property}/checklist`).set(accounts.admin.headers).expect(200)).body;
   await t.test('Delete buttons follow roles and reviewer ownership',()=>{
     for(const role of ['user','viewer','collector']) {
