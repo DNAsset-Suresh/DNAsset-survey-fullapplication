@@ -343,8 +343,8 @@ export function renderProjectDetail(project, matrixData, state) {
   const p = project;
   const prog = p.progress || { survey_count: 0, required: 0, collected: 0, pending: 0, verified: 0, rejected: 0, under_review: 0, collection_percentage: 0, verification_percentage: 0 };
   const checklists = matrixData.survey_checklists || [];
-  const canEdit = !p.archived_at && !state.preview && ['admin', 'collector'].includes(state.profile.role);
-  const canAddSurvey = !p.archived_at && !state.preview && ['admin', 'collector', 'reviewer'].includes(state.profile.role);
+  const canEdit = !p.archived_at && !state.preview && state.profile.role === 'admin';
+  const canAddSurvey = !p.archived_at && !state.preview && ['admin', 'reviewer'].includes(state.profile.role);
   const canDelete = !state.preview && state.profile.role === 'admin';
   const isProtected = Boolean(p.is_password_protected);
   const isUnlocked = Boolean(p.is_unlocked);

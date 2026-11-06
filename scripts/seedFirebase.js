@@ -89,20 +89,6 @@ const users = [
     password: 'naresh123',
     role: 'reviewer',
     full_name: 'Naresh'
-  },
-  {
-    id: '10000000-0000-4000-8000-000000000008',
-    email: 'user@dnassets.com',
-    password: 'user123',
-    role: 'user',
-    full_name: 'Suresh'
-  },
-  {
-    id: '10000000-0000-4000-8000-000000000004',
-    email: 'viewer@dnassets.com',
-    password: 'viewer123',
-    role: 'viewer',
-    full_name: 'DNAssets Viewer'
   }
 ];
 

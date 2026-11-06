@@ -63,7 +63,7 @@ export const updateProfileSchema = z.object({
 export const adminUpdateUserSchema = z.object({
   full_name: z.string().trim().min(1, 'Name is required').max(160).optional(),
   password: z.string().min(4, 'Password must be at least 4 characters').max(1024).optional(),
-  role: z.enum(['admin', 'user', 'reviewer', 'collector', 'viewer']).optional()
+  role: z.enum(['admin', 'reviewer']).optional()
 }).strict().refine(data => data.full_name !== undefined || data.password !== undefined || data.role !== undefined, {
   message: 'Either name, password, or role must be provided.'
 });

@@ -17,7 +17,7 @@ const state = {
   properties: [],
   currentProject: null,
   currentMatrix: null,
-  profile: { full_name: 'Preview workspace', role: 'viewer' },
+  profile: { full_name: 'Preview workspace', role: 'admin' },
   config: { maxFileBytes: 20971520 }
 };
 
@@ -47,8 +47,8 @@ const navIcon = {
 
 let renderVersion = 0;
 const previewNotice = () => toast('This is a read-only preview. Configure Supabase to save and manage records.');
-const canEdit = () => !state.preview && !state.checklist?.property?.project_archived_at && ['admin', 'collector'].includes(state.profile.role);
-const canAddSurvey = () => !state.preview && !state.checklist?.property?.project_archived_at && ['admin', 'collector', 'reviewer'].includes(state.profile.role);
+const canEdit = () => !state.preview && !state.checklist?.property?.project_archived_at && state.profile?.role === 'admin';
+const canAddSurvey = () => !state.preview && !state.checklist?.property?.project_archived_at && ['admin', 'reviewer'].includes(state.profile?.role);
 
 function shell() {
   document.querySelector('#app').innerHTML = `
@@ -475,7 +475,7 @@ export function adminUserModal(targetUser, onUpdated) {
         </label>
         <label>User Role
           <select name="role">
-            ${['user', 'reviewer', 'admin', 'collector', 'viewer'].map(r => `<option value="${r}" ${u.role === r ? 'selected' : ''}>${r.charAt(0).toUpperCase() + r.slice(1)}</option>`).join('')}
+            ${['admin', 'reviewer'].map(r => `<option value="${r}" ${u.role === r ? 'selected' : ''}>${r === 'admin' ? 'Admin' : 'Reviewer'}</option>`).join('')}
           </select>
         </label>
       </div>
@@ -980,7 +980,6 @@ function wire(page, id) {
     zone.ondrop = protect(async e => {
       e.preventDefault();
       zone.classList.remove('dragging');
-      if (state.profile.role === 'viewer') throw new Error('Your role cannot upload files.');
       await handleUpload(e.dataTransfer.files, zone.dataset.drop);
     });
     if (state.preview) zone.ondrop = e => {

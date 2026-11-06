@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
-const {SUPABASE_URL,SUPABASE_SECRET_KEY,BOOTSTRAP_USER_EMAIL,BOOTSTRAP_USER_PASSWORD,BOOTSTRAP_USER_ROLE='viewer'}=process.env;
+const {SUPABASE_URL,SUPABASE_SECRET_KEY,BOOTSTRAP_USER_EMAIL,BOOTSTRAP_USER_PASSWORD,BOOTSTRAP_USER_ROLE='reviewer'}=process.env;
 if(!SUPABASE_URL||!SUPABASE_SECRET_KEY||!BOOTSTRAP_USER_EMAIL||!BOOTSTRAP_USER_PASSWORD)throw Error('Supply explicit Supabase server credentials and BOOTSTRAP_USER_EMAIL / BOOTSTRAP_USER_PASSWORD. This script never resets existing users.');
-if(!['admin','reviewer','collector','viewer','user'].includes(BOOTSTRAP_USER_ROLE))throw Error('Invalid role');
+if(!['admin','reviewer'].includes(BOOTSTRAP_USER_ROLE))throw Error('Invalid role');
 const client=createClient(SUPABASE_URL,SUPABASE_SECRET_KEY,{auth:{persistSession:false}});
 const {data,error}=await client.auth.admin.createUser({email:BOOTSTRAP_USER_EMAIL,password:BOOTSTRAP_USER_PASSWORD,email_confirm:true});
 if(error)throw Error('User creation failed; existing accounts were not changed.');

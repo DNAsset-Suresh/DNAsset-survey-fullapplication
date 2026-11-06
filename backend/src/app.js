@@ -77,7 +77,7 @@ export function createApp(config=configuration(),providedClients) {
     next();
   });
   const role=(...roles)=>(req,_res,next)=>next(roles.includes(req.profile.role)?undefined:fail(403,'Your role cannot perform this action.'));
-  const writer=role('admin','collector','reviewer','user');
+  const writer=role('admin','reviewer');
   const rpc=async(req,name,args)=>unwrap(await dbs.admin.rpc('survey_run',{p_actor:req.actor,p_operation:name,p_args:args,p_ip:req.ip}));
   app.get('/api/health',async(req,res)=>{unwrap(await req.db.from('document_categories').select('id').limit(1));res.json({status:'ok'});});
   app.get('/api/me',(req,res)=>res.json(req.profile));
@@ -204,7 +204,7 @@ export function createApp(config=configuration(),providedClients) {
     }));
   });
 
-  app.post('/api/projects', role('admin', 'collector'), async (req, res) => {
+  app.post('/api/projects', role('admin'), async (req, res) => {
     const data = projectSchema.parse(req.body);
     if(data.access_password)data.access_password=await hashPassword(data.access_password);
     const id = await rpc(req,'save_project', { p_actor: req.actor, p_data: data });
@@ -255,7 +255,7 @@ export function createApp(config=configuration(),providedClients) {
     });
   });
 
-  app.put('/api/projects/:id', role('admin', 'collector'), async (req, res) => {
+  app.put('/api/projects/:id', role('admin'), async (req, res) => {
     const id = uuid.parse(req.params.id);
     await projectAccess(req.db, id);
     const data = projectSchema.parse(req.body);
@@ -296,7 +296,7 @@ export function createApp(config=configuration(),providedClients) {
     res.json(surveys.map(s => ({ ...s, progress: progress.find(x => x.property_id === s.id) })));
   });
 
-  app.post('/api/projects/:id/survey-numbers', role('admin', 'collector', 'reviewer'), async (req, res) => {
+  app.post('/api/projects/:id/survey-numbers', role('admin', 'reviewer'), async (req, res) => {
     const projectId = uuid.parse(req.params.id);
     const project = await projectAccess(req.db, projectId);
     const body = propertySchema.parse(req.body);
@@ -379,11 +379,11 @@ export function createApp(config=configuration(),providedClients) {
     const progressById=new Map(progress.map(p=>[p.property_id,p]));
     res.json(properties.filter(p=>!p.project_id||active.has(p.project_id)).map(p=>({...p,progress:progressById.get(p.id)})));
   });
-  app.post('/api/properties',role('admin','collector','reviewer'),async(req,res)=>{
+  app.post('/api/properties',role('admin','reviewer'),async(req,res)=>{
     const id=await rpc(req,'save_property',{p_actor:req.actor,p_data:propertySchema.parse(req.body)});res.status(201).json({id});
   });
   app.get('/api/properties/:id',async(req,res)=>res.json(await propertyAccess(req.db,uuid.parse(req.params.id))));
-  app.put('/api/properties/:id',role('admin','collector','reviewer'),async(req,res)=>{
+  app.put('/api/properties/:id',role('admin','reviewer'),async(req,res)=>{
     const id=uuid.parse(req.params.id);await propertyAccess(req.db,id);
     await rpc(req,'save_property',{p_actor:req.actor,p_id:id,p_data:propertySchema.parse(req.body)});res.json({id});
   });
@@ -434,7 +434,7 @@ export function createApp(config=configuration(),providedClients) {
     async(req,_res,next)=>{req.document=await documentAccess(req.db,uuid.parse(req.params.documentId),req.params.propertyId?uuid.parse(req.params.propertyId):undefined);next();},upload,async(req,res)=>{
       const replaceId=req.body.replace_id?uuid.parse(req.body.replace_id):null;
       if(replaceId){
-        if(!['admin','collector','user'].includes(req.profile.role)) throw fail(403,'Reviewers cannot replace existing files.');
+        if(!['admin','reviewer'].includes(req.profile.role)) throw fail(403,'Permission denied.');
         const previous=await fileAccess(req.db,replaceId);
         if(previous.property_document_id!==req.document.id) throw fail(400,'Replacement must belong to this category.');
         if(req.profile.role !== 'admin' && previous.uploaded_by !== req.actor) throw fail(403, 'You cannot replace another user\'s file.');
