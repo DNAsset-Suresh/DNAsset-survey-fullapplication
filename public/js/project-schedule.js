@@ -792,3 +792,4 @@ export async function exportScheduleToExcel(project, schedules = []) {
     toast('Excel export failed: ' + err.message, true);
   }
 }
+

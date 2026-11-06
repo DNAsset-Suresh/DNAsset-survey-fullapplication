@@ -104,3 +104,4 @@ drop policy if exists project_acquisition_deeds_policy on public.project_acquisi
 create policy project_acquisition_deeds_policy on public.project_acquisition_deeds for all to authenticated using(public.can_access_project(project_id));
 
 commit;
+

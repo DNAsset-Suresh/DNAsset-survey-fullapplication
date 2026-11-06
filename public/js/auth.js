@@ -31,6 +31,24 @@ export function loginScreen(onLogin){
           </div>
         </label>
         <button class="button primary full" type="submit">Sign in ${icon('arrow')}</button>
+
+        <div class="login-quick-accounts" style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border, #e2e8f0);">
+          <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted, #64748b); font-weight: 600; display: block; margin-bottom: 8px;">Quick Sign-in Credentials:</span>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <button type="button" class="button small-button" data-fill-login="admin@dnassets.com" data-fill-pass="admin123" style="text-align: left; justify-content: space-between; font-size: 12px; padding: 6px 10px;">
+              <span><strong>Admin:</strong> admin@dnassets.com</span>
+              <code style="background: rgba(0,0,0,0.05); padding: 2px 6px; border-radius: 4px;">admin123</code>
+            </button>
+            <button type="button" class="button small-button" data-fill-login="reviewer@dnassets.com" data-fill-pass="reviewer123" style="text-align: left; justify-content: space-between; font-size: 12px; padding: 6px 10px;">
+              <span><strong>Reviewer:</strong> reviewer@dnassets.com</span>
+              <code style="background: rgba(0,0,0,0.05); padding: 2px 6px; border-radius: 4px;">reviewer123</code>
+            </button>
+            <button type="button" class="button small-button" data-fill-login="dna.callus@gmail.com" data-fill-pass="dna.suresh123" style="text-align: left; justify-content: space-between; font-size: 12px; padding: 6px 10px;">
+              <span><strong>DN Assets:</strong> dna.callus@gmail.com</span>
+              <code style="background: rgba(0,0,0,0.05); padding: 2px 6px; border-radius: 4px;">dna.suresh123</code>
+            </button>
+          </div>
+        </div>
       </form>
     </section>
   </div>`;
@@ -42,6 +60,15 @@ export function loginScreen(onLogin){
      if (target) target.type = target.type === 'password' ? 'text' : 'password';
    };
  }
+
+ document.querySelectorAll('[data-fill-login]').forEach(btn => {
+   btn.onclick = () => {
+     const emailInput = document.querySelector('#login_email');
+     const passInput = document.querySelector('#login_password');
+     if (emailInput) emailInput.value = btn.dataset.fillLogin;
+     if (passInput) passInput.value = btn.dataset.fillPass;
+   };
+ });
 
  wireForm(document.querySelector('#login-form'),async data=>{const session=await api('/auth/login',{method:'POST',body:Object.fromEntries(data),publicRequest:true});setSession(session);await onLogin();});
 }
