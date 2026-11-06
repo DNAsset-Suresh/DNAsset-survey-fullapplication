@@ -80,7 +80,6 @@ export function renderDashboard(projects, properties, summary, activeMatrix, cur
         <p>A unified hierarchy: Project Name is the main record holding multiple survey numbers.</p>
       </div>
       <div class="button-group">
-        <a class="button" href="#property-overview">${icon('reports')} Property Overview</a>
         <button class="button primary" data-add-project>${icon('plus')} Add New Project</button>
         <button class="button" data-add-survey>${icon('plus')} Add Survey Number</button>
       </div>

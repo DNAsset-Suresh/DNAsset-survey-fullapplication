@@ -6,7 +6,6 @@ import { loginScreen, logout } from './auth.js';
 import { esc, icon, toast, modal, date, badge, empty, meter } from './ui.js';
 import { previewProperty, previewChecklist } from './preview.js';
 import { renderDashboard, surveyTable, locationText } from './dashboard.js';
-import { mountPropertyOverview } from './property-overview.js';
 import { propertyForm } from './surveys.js';
 import { renderChecklist, reviewDialog } from './checklist.js';
 import { uploadFiles, openFile } from './uploads.js';
@@ -25,7 +24,6 @@ const state = {
 
 const navigation = [
   ['dashboard', 'Dashboard'],
-  ['property-overview', 'Property Overview'],
   ['projects', 'Projects'],
   ['surveys', 'Survey numbers'],
   ['documents', 'Document Checklist'],
@@ -38,7 +36,6 @@ const navigation = [
 
 const navIcon = {
   dashboard: 'dashboard',
-  'property-overview': 'reports',
   projects: 'folder',
   surveys: 'survey',
   documents: 'documents',
@@ -47,7 +44,6 @@ const navIcon = {
 };
 
 let renderVersion = 0;
-let disposeOverview = () => {};
 const previewNotice = () => toast('This is a read-only preview. Configure Supabase to save and manage records.');
 const canEdit = () => !state.preview && !state.checklist?.property?.project_archived_at && state.profile?.role === 'admin';
 const canAddSurvey = () => !state.preview && !state.checklist?.property?.project_archived_at && ['admin', 'reviewer'].includes(state.profile?.role);
@@ -171,12 +167,10 @@ async function route(reuseData = false) {
     location.hash = '#documents';
     return;
   }
-  if (page === 'users') {
+  if (page === 'users' || page === 'property-overview') {
     location.hash = '#dashboard';
     return;
   }
-  disposeOverview();
-  disposeOverview = () => {};
   const active = page === 'survey' ? 'surveys' : page === 'project' ? 'projects' : page;
 
   document.querySelectorAll('[data-nav]').forEach(a => {
@@ -190,13 +184,11 @@ async function route(reuseData = false) {
   const breadcrumbEl = document.querySelector('#breadcrumb-current');
   if (breadcrumbEl) {
     if (page === 'project') breadcrumbEl.textContent = 'Project Overview';
-    else if (page === 'property-overview') breadcrumbEl.textContent = 'Property Overview';
     else if (page === 'survey') breadcrumbEl.textContent = 'Survey Checklist';
     else breadcrumbEl.textContent = navigation.find(n => n[0] === page)?.[1] || 'Workspace';
   }
 
   const main = document.querySelector('#main');
-  main.classList.toggle('property-overview-view', page === 'property-overview');
   main.setAttribute('aria-busy', 'true');
   main.innerHTML = '<div class="loading-state">Loading your records…</div>';
 
@@ -210,8 +202,7 @@ async function route(reuseData = false) {
 
     if (['history','audit','database'].includes(page)) {
       html=await renderManagement(page,id,state);
-    } else if (page === 'property-overview') {
-      html = '<div id="property-overview-host"></div>';
+
     } else if (page === 'dashboard') {
       const summary = state.preview ? { properties: 1, ...previewProperty.progress } : await api('/reports/summary');
       let matrix = null;
@@ -419,16 +410,6 @@ async function route(reuseData = false) {
 
     if (version !== renderVersion) return;
     main.innerHTML = html;
-    const overviewHost = main.querySelector('#property-overview-host');
-    if (overviewHost) {
-      try {
-        const dispose = await mountPropertyOverview(overviewHost);
-        if (version !== renderVersion) { dispose?.(); return; }
-        disposeOverview = dispose || (() => {});
-      } catch (overviewErr) {
-        console.error('[PropertyOverview] Error mounting:', overviewErr);
-      }
-    }
     main.removeAttribute('aria-busy');
     wire(page, id);
     wireManagement(page,id,state,route);
